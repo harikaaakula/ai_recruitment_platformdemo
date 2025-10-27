@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Layout from '../../../components/Layout';
 import { useAuth } from '../../../context/AuthContext';
 import { applicationsAPI, testsAPI } from '../../../utils/api';
+import AIRecommendations from '../../../components/AIRecommendations';
 
 export default function ApplicationDetails() {
   const { isRecruiter } = useAuth();
@@ -352,6 +353,12 @@ export default function ApplicationDetails() {
                 </div>
               </div>
             )}
+
+            {/* AI Recommendations Section */}
+            <AIRecommendations 
+              applicationId={id} 
+              candidateName={application.candidate_name}
+            />
           </div>
         </div>
       </div>

@@ -21,6 +21,7 @@ app.use('/api/applications', require('./routes/applications'));
 app.use('/api/tests', require('./routes/tests'));
 app.use('/api/insights', require('./routes/insights'));
 app.use('/api/erd', require('./routes/erd_compliant'));
+app.use('/api/ai-recommendations', require('./routes/aiRecommendations'));
 
 app.get('/', (req, res) => {
   res.json({ message: 'AI Recruitment Platform API' });

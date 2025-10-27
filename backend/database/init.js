@@ -4,77 +4,111 @@ const path = require('path');
 const dbPath = path.join(__dirname, 'recruitment.db');
 const db = new sqlite3.Database(dbPath);
 
-// Initialize database tables
+// Initialize database tables - ERD COMPLIANT STRUCTURE
 db.serialize(() => {
-  // Users table (both candidates and recruiters)
+  // Users table (recruiters only - candidates are separate)
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
-      role TEXT NOT NULL CHECK(role IN ('candidate', 'recruiter')),
+      role TEXT NOT NULL CHECK(role IN ('recruiter')),
       name TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
-  // Job postings table
+  // Candidate_table (as per ERD)
   db.run(`
-    CREATE TABLE IF NOT EXISTS jobs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      description TEXT NOT NULL,
-      requirements TEXT NOT NULL,
-      threshold_score INTEGER DEFAULT 70,
+    CREATE TABLE IF NOT EXISTS candidate_table (
+      candidate_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      phone TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Job_Role_Table (as per ERD)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS job_role_table (
+      role_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      role_name TEXT NOT NULL,
+      role_description TEXT NOT NULL,
+      min_ai_score_threshold INTEGER DEFAULT 70,
       recruiter_id INTEGER NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (recruiter_id) REFERENCES users (id)
     )
   `);
 
-  // Applications table
+  // Resume_Analysis_table (as per ERD)
   db.run(`
-    CREATE TABLE IF NOT EXISTS applications (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      job_id INTEGER NOT NULL,
-      candidate_email TEXT NOT NULL,
-      candidate_name TEXT NOT NULL,
-      candidate_phone TEXT,
+    CREATE TABLE IF NOT EXISTS resume_analysis_table (
+      analysis_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      candidate_id INTEGER NOT NULL,
+      role_id INTEGER NOT NULL,
+      ai_match_score INTEGER NOT NULL,
+      matched_skills TEXT,
+      application_date DATETIME DEFAULT CURRENT_TIMESTAMP,
       resume_path TEXT,
-      ai_score INTEGER,
-      test_score INTEGER,
-      ai_insights TEXT,
-      status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'eligible', 'not_eligible', 'test_completed')),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (job_id) REFERENCES jobs (id)
+      skill_gaps TEXT,
+      experience_years INTEGER,
+      experience_level TEXT CHECK(experience_level IN ('entry', 'mid', 'senior', 'lead')),
+      education TEXT,
+      certifications TEXT,
+      FOREIGN KEY (candidate_id) REFERENCES candidate_table (candidate_id),
+      FOREIGN KEY (role_id) REFERENCES job_role_table (role_id)
     )
   `);
 
-  // Test results table
+  // Assessment_table (as per ERD)
   db.run(`
-    CREATE TABLE IF NOT EXISTS test_results (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      application_id INTEGER NOT NULL,
-      answers TEXT NOT NULL,
-      score INTEGER NOT NULL,
-      completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (application_id) REFERENCES applications (id)
+    CREATE TABLE IF NOT EXISTS assessment_table (
+      assessment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      analysis_id INTEGER NOT NULL,
+      objective_test_score INTEGER,
+      test_link_token TEXT UNIQUE,
+      test_completed_at DATETIME,
+      test_duration INTEGER,
+      answers TEXT,
+      FOREIGN KEY (analysis_id) REFERENCES resume_analysis_table (analysis_id)
+    )
+  `);
+
+  // Recruiter_decision_table (as per ERD)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS recruiter_decision_table (
+      decision_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      analysis_id INTEGER NOT NULL,
+      composite_fit_score INTEGER,
+      experience_level TEXT,
+      resume_weightage INTEGER,
+      test_weightage INTEGER,
+      weighted_resume_score INTEGER,
+      weighted_test_score INTEGER,
+      hiring_status TEXT CHECK(hiring_status IN ('pending', 'shortlisted', 'rejected', 'hired')),
+      decision_comments TEXT,
+      decision_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+      recruiter_id INTEGER NOT NULL,
+      FOREIGN KEY (analysis_id) REFERENCES resume_analysis_table (analysis_id),
+      FOREIGN KEY (recruiter_id) REFERENCES users (id)
     )
   `);
 
   // Seed database with sample data
   setTimeout(() => {
-    // Check if we need to seed data (only if no jobs exist)
-    db.get('SELECT COUNT(*) as count FROM jobs', (err, row) => {
+    // Check if we need to seed data (only if no job roles exist)
+    db.get('SELECT COUNT(*) as count FROM job_role_table', (err, row) => {
       if (!err && row.count === 0) {
-        console.log('Seeding database with sample data...');
-        seedSampleData();
+        console.log('Seeding database with ERD-compliant sample data...');
+        seedERDCompliantData();
       }
     });
   }, 1000);
 });
 
-const seedSampleData = async () => {
+const seedERDCompliantData = async () => {
   const bcrypt = require('bcryptjs');
   
   // Create sample recruiters
@@ -96,170 +130,126 @@ const seedSampleData = async () => {
     );
   });
 
-  // Create sample jobs
-  const sampleJobs = [
+  // Sample job roles (ERD compliant)
+  const jobRoles = [
     {
-      id: 1, title: 'Senior Software Developer', recruiter_id: 1, threshold_score: 75,
-      description: 'We are looking for an experienced software developer to join our dynamic team. You will be responsible for developing high-quality applications, collaborating with cross-functional teams, and mentoring junior developers.',
-      requirements: 'Bachelor\'s degree in Computer Science or related field. 5+ years of experience in software development. Proficiency in JavaScript, React, Node.js, and SQL databases. Experience with cloud platforms (AWS/Azure).'
+      role_id: 1, role_name: 'Senior Software Developer', recruiter_id: 1, min_ai_score_threshold: 75,
+      role_description: 'We are looking for an experienced software developer to join our dynamic team. Requirements: Bachelor\'s degree in Computer Science, 5+ years experience in JavaScript, React, Node.js, and SQL databases.'
     },
     {
-      id: 2, title: 'Frontend React Developer', recruiter_id: 1, threshold_score: 70,
-      description: 'Join our frontend team to build amazing user interfaces and experiences. You will work closely with designers and backend developers to create responsive, accessible, and performant web applications.',
-      requirements: 'Bachelor\'s degree in Computer Science, Web Development, or related field. 3+ years of experience with React.js and modern JavaScript (ES6+). Strong knowledge of HTML5, CSS3, and responsive design.'
+      role_id: 2, role_name: 'Frontend React Developer', recruiter_id: 1, min_ai_score_threshold: 70,
+      role_description: 'Join our frontend team to build amazing user interfaces. Requirements: 3+ years experience with React.js and modern JavaScript, strong knowledge of HTML5, CSS3.'
     },
     {
-      id: 3, title: 'Data Scientist', recruiter_id: 3, threshold_score: 80,
-      description: 'We are seeking a talented Data Scientist to extract insights from complex datasets and drive data-driven decision making. You will work on machine learning models, statistical analysis, and data visualization.',
-      requirements: 'Master\'s degree in Data Science, Statistics, Mathematics, or related field. 4+ years of experience in data analysis and machine learning. Proficiency in Python, pandas, numpy, scikit-learn, and SQL.'
-    },
-    {
-      id: 4, title: 'Digital Marketing Manager', recruiter_id: 2, threshold_score: 65,
-      description: 'Lead our digital marketing efforts to drive brand awareness, customer acquisition, and revenue growth. You will develop and execute comprehensive marketing strategies across multiple channels.',
-      requirements: 'Bachelor\'s degree in Marketing, Business, or related field. 5+ years of experience in digital marketing. Proven track record with Google Ads, Facebook Ads, and other paid advertising platforms.'
-    },
-    {
-      id: 5, title: 'Full Stack Developer', recruiter_id: 2, threshold_score: 75,
-      description: 'We need a versatile full stack developer who can work on both frontend and backend systems. You will be involved in the entire development lifecycle, from planning and design to deployment.',
-      requirements: 'Bachelor\'s degree in Computer Science or equivalent experience. 4+ years of full stack development experience. Proficiency in JavaScript/TypeScript, React, Node.js, and Express.'
-    },
-    {
-      id: 6, title: 'Machine Learning Engineer', recruiter_id: 3, threshold_score: 85,
-      description: 'Join our AI team to build and deploy machine learning models at scale. You will work on exciting projects involving natural language processing, computer vision, and predictive analytics.',
-      requirements: 'Master\'s degree in Computer Science, Machine Learning, or related field. 3+ years of experience in machine learning and deep learning. Proficiency in Python, TensorFlow/PyTorch, and scikit-learn.'
-    },
-    {
-      id: 7, title: 'UX/UI Designer', recruiter_id: 2, threshold_score: 70,
-      description: 'Create intuitive and beautiful user experiences for our digital products. You will conduct user research, create wireframes and prototypes, and collaborate with developers.',
-      requirements: 'Bachelor\'s degree in Design, HCI, or related field. 4+ years of UX/UI design experience. Proficiency in design tools (Figma, Sketch, Adobe Creative Suite). Strong portfolio demonstrating user-centered design process.'
-    },
-    {
-      id: 8, title: 'DevOps Engineer', recruiter_id: 1, threshold_score: 80,
-      description: 'Help us build and maintain robust, scalable infrastructure. You will work on automation, monitoring, and deployment pipelines to ensure our applications run smoothly.',
-      requirements: 'Bachelor\'s degree in Computer Science, Engineering, or related field. 4+ years of DevOps/Infrastructure experience. Expertise in AWS/Azure cloud platforms. Proficiency with Docker, Kubernetes, and container orchestration.'
+      role_id: 3, role_name: 'Data Scientist', recruiter_id: 3, min_ai_score_threshold: 80,
+      role_description: 'Extract insights from complex datasets. Requirements: Master\'s degree in Data Science, 4+ years experience in Python, pandas, numpy, scikit-learn, and SQL.'
     }
   ];
 
+  // Sample candidates (ERD compliant)
+  const candidates = [
+    { candidate_id: 1, name: 'Sarah Johnson', email: 'sarah.johnson@email.com', phone: '+1-555-0123' },
+    { candidate_id: 2, name: 'Michael Chen', email: 'michael.chen@email.com', phone: '+1-555-0124' },
+    { candidate_id: 3, name: 'Dr. Emily Rodriguez', email: 'emily.rodriguez@email.com', phone: '+1-555-0125' }
+  ];
+
+  // Sample resume analyses (ERD compliant)
+  const analyses = [
+    {
+      analysis_id: 1, candidate_id: 1, role_id: 1, ai_match_score: 87,
+      matched_skills: JSON.stringify([
+        { skill: 'JavaScript', category: 'programming', level: 'expert' },
+        { skill: 'React', category: 'frontend', level: 'expert' },
+        { skill: 'Node.js', category: 'backend', level: 'intermediate' }
+      ]),
+      skill_gaps: JSON.stringify([{ skill: 'TypeScript', category: 'programming', priority: 'medium' }]),
+      experience_years: 6, experience_level: 'senior',
+      education: 'Bachelor\'s in Computer Science',
+      certifications: 'AWS Certified Developer'
+    },
+    {
+      analysis_id: 2, candidate_id: 2, role_id: 2, ai_match_score: 78,
+      matched_skills: JSON.stringify([
+        { skill: 'React', category: 'frontend', level: 'expert' },
+        { skill: 'JavaScript', category: 'programming', level: 'intermediate' }
+      ]),
+      skill_gaps: JSON.stringify([{ skill: 'Redux', category: 'frontend', priority: 'high' }]),
+      experience_years: 4, experience_level: 'mid',
+      education: 'Bachelor\'s in Web Development',
+      certifications: 'Google Analytics Certified'
+    },
+    {
+      analysis_id: 3, candidate_id: 3, role_id: 3, ai_match_score: 94,
+      matched_skills: JSON.stringify([
+        { skill: 'Python', category: 'programming', level: 'expert' },
+        { skill: 'Machine Learning', category: 'data', level: 'expert' },
+        { skill: 'SQL', category: 'database', level: 'expert' }
+      ]),
+      skill_gaps: JSON.stringify([{ skill: 'Deep Learning', category: 'data', priority: 'medium' }]),
+      experience_years: 8, experience_level: 'senior',
+      education: 'PhD in Data Science',
+      certifications: 'Google Cloud ML Engineer, Coursera ML Specialization'
+    }
+  ];
+
+  // Sample assessments (ERD compliant)
+  const assessments = [
+    { assessment_id: 1, analysis_id: 1, objective_test_score: 92, test_link_token: 'test-token-1' },
+    { assessment_id: 2, analysis_id: 2, objective_test_score: 85, test_link_token: 'test-token-2' },
+    { assessment_id: 3, analysis_id: 3, objective_test_score: 88, test_link_token: 'test-token-3' }
+  ];
+
+  // Insert job roles
   setTimeout(() => {
-    sampleJobs.forEach(job => {
+    jobRoles.forEach(role => {
       db.run(
-        'INSERT OR IGNORE INTO jobs (id, title, description, requirements, threshold_score, recruiter_id, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime("now", "-" || ? || " days"))',
-        [job.id, job.title, job.description, job.requirements, job.threshold_score, job.recruiter_id, Math.floor(Math.random() * 30)],
+        'INSERT OR IGNORE INTO job_role_table (role_id, role_name, role_description, min_ai_score_threshold, recruiter_id) VALUES (?, ?, ?, ?, ?)',
+        [role.role_id, role.role_name, role.role_description, role.min_ai_score_threshold, role.recruiter_id],
         (err) => {
-          if (!err) console.log(`Created job: ${job.title}`);
+          if (!err) console.log(`Created job role: ${role.role_name}`);
         }
       );
     });
   }, 1000);
 
-  // Sample applications with detailed AI insights
-  const applications = [
-    {
-      id: 1, job_id: 1, candidate_name: 'Sarah Johnson', candidate_email: 'sarah.johnson@email.com',
-      candidate_phone: '+1-555-0123', ai_score: 87, test_score: 92, status: 'test_completed',
-      ai_insights: JSON.stringify({
-        skills_matched: [
-          { skill: 'JavaScript', category: 'programming', level: 'expert' },
-          { skill: 'React', category: 'frontend', level: 'expert' },
-          { skill: 'Node.js', category: 'backend', level: 'intermediate' }
-        ],
-        skill_gaps: [{ skill: 'TypeScript', category: 'programming', priority: 'medium' }],
-        certifications: ['AWS Certified Developer'],
-        education: { level: 'bachelors', field: 'computer science' },
-        experience_years: 6,
-        strengths: ['Strong frontend skills', 'Full-stack capabilities'],
-        recommendations: ['Consider AWS certification'],
-        industry_experience: ['fintech', 'saas']
-      })
-    },
-    {
-      id: 2, job_id: 2, candidate_name: 'Michael Chen', candidate_email: 'michael.chen@email.com',
-      candidate_phone: '+1-555-0124', ai_score: 78, test_score: 85, status: 'test_completed',
-      ai_insights: JSON.stringify({
-        skills_matched: [
-          { skill: 'React', category: 'frontend', level: 'expert' },
-          { skill: 'JavaScript', category: 'programming', level: 'intermediate' }
-        ],
-        skill_gaps: [{ skill: 'Redux', category: 'frontend', priority: 'high' }],
-        certifications: ['Google Analytics Certified'],
-        education: { level: 'bachelors', field: 'web development' },
-        experience_years: 4,
-        strengths: ['UI/UX focus', 'Modern React patterns'],
-        recommendations: ['Learn Redux for state management'],
-        industry_experience: ['e-commerce', 'startup']
-      })
-    },
-    {
-      id: 3, job_id: 3, candidate_name: 'Dr. Emily Rodriguez', candidate_email: 'emily.rodriguez@email.com',
-      candidate_phone: '+1-555-0125', ai_score: 94, test_score: 88, status: 'test_completed',
-      ai_insights: JSON.stringify({
-        skills_matched: [
-          { skill: 'Python', category: 'programming', level: 'expert' },
-          { skill: 'Machine Learning', category: 'data', level: 'expert' },
-          { skill: 'SQL', category: 'database', level: 'expert' }
-        ],
-        skill_gaps: [{ skill: 'Deep Learning', category: 'data', priority: 'medium' }],
-        certifications: ['Google Cloud ML Engineer', 'Coursera ML Specialization'],
-        education: { level: 'phd', field: 'data science' },
-        experience_years: 8,
-        strengths: ['Advanced statistical knowledge', 'Research background'],
-        recommendations: ['Explore deep learning frameworks'],
-        industry_experience: ['healthcare', 'fintech']
-      })
-    },
-    {
-      id: 4, job_id: 1, candidate_name: 'David Kim', candidate_email: 'david.kim@email.com',
-      candidate_phone: '+1-555-0127', ai_score: 65, test_score: null, status: 'not_eligible',
-      ai_insights: JSON.stringify({
-        skills_matched: [{ skill: 'JavaScript', category: 'programming', level: 'beginner' }],
-        skill_gaps: [
-          { skill: 'React', category: 'frontend', priority: 'high' },
-          { skill: 'Node.js', category: 'backend', priority: 'high' }
-        ],
-        certifications: [],
-        education: { level: 'bachelors', field: 'computer science' },
-        experience_years: 1,
-        strengths: ['Basic programming knowledge', 'Eager to learn'],
-        recommendations: ['Gain more hands-on experience', 'Learn modern frameworks'],
-        industry_experience: []
-      })
-    },
-    {
-      id: 5, job_id: 5, candidate_name: 'Lisa Wang', candidate_email: 'lisa.wang@email.com',
-      candidate_phone: '+1-555-0128', ai_score: 81, test_score: 87, status: 'test_completed',
-      ai_insights: JSON.stringify({
-        skills_matched: [
-          { skill: 'JavaScript', category: 'programming', level: 'expert' },
-          { skill: 'React', category: 'frontend', level: 'intermediate' },
-          { skill: 'Node.js', category: 'backend', level: 'intermediate' }
-        ],
-        skill_gaps: [{ skill: 'TypeScript', category: 'programming', priority: 'medium' }],
-        certifications: ['MongoDB Certified Developer'],
-        education: { level: 'masters', field: 'computer science' },
-        experience_years: 5,
-        strengths: ['Full-stack capabilities', 'Modern tech stack'],
-        recommendations: ['Add TypeScript to skill set'],
-        industry_experience: ['startup', 'saas']
-      })
-    }
-  ];
-
-  // Insert applications after a delay to ensure jobs are created
+  // Insert candidates
   setTimeout(() => {
-    applications.forEach(app => {
-      const daysAgo = Math.floor(Math.random() * 7) + 1;
+    candidates.forEach(candidate => {
       db.run(
-        `INSERT OR IGNORE INTO applications 
-         (id, job_id, candidate_name, candidate_email, candidate_phone, ai_score, test_score, status, ai_insights, created_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '-' || ? || ' days'))`,
-        [app.id, app.job_id, app.candidate_name, app.candidate_email, app.candidate_phone, 
-         app.ai_score, app.test_score, app.status, app.ai_insights, daysAgo],
+        'INSERT OR IGNORE INTO candidate_table (candidate_id, name, email, phone) VALUES (?, ?, ?, ?)',
+        [candidate.candidate_id, candidate.name, candidate.email, candidate.phone],
         (err) => {
-          if (!err) console.log(`Created application: ${app.candidate_name}`);
+          if (!err) console.log(`Created candidate: ${candidate.name}`);
+        }
+      );
+    });
+  }, 1500);
+
+  // Insert resume analyses
+  setTimeout(() => {
+    analyses.forEach(analysis => {
+      db.run(
+        'INSERT OR IGNORE INTO resume_analysis_table (analysis_id, candidate_id, role_id, ai_match_score, matched_skills, skill_gaps, experience_years, experience_level, education, certifications) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [analysis.analysis_id, analysis.candidate_id, analysis.role_id, analysis.ai_match_score, analysis.matched_skills, analysis.skill_gaps, analysis.experience_years, analysis.experience_level, analysis.education, analysis.certifications],
+        (err) => {
+          if (!err) console.log(`Created analysis for candidate ID: ${analysis.candidate_id}`);
         }
       );
     });
   }, 2000);
+
+  // Insert assessments
+  setTimeout(() => {
+    assessments.forEach(assessment => {
+      db.run(
+        'INSERT OR IGNORE INTO assessment_table (assessment_id, analysis_id, objective_test_score, test_link_token) VALUES (?, ?, ?, ?)',
+        [assessment.assessment_id, assessment.analysis_id, assessment.objective_test_score, assessment.test_link_token],
+        (err) => {
+          if (!err) console.log(`Created assessment for analysis ID: ${assessment.analysis_id}`);
+        }
+      );
+    });
+  }, 2500);
 };
 
 module.exports = db;
