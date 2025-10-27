@@ -146,7 +146,9 @@ const AIRecommendations = ({ applicationId, candidateName }) => {
               <h4 className="font-semibold text-green-700 mb-2">✅ Key Strengths</h4>
               <ul className="space-y-1">
                 {recommendation.key_strengths.map((strength, index) => (
-                  <li key={index} className="text-sm text-gray-700">• {strength}</li>
+                  <li key={index} className="text-sm text-gray-700">
+                    • {typeof strength === 'object' ? `${strength.skill} (${strength.level})` : strength}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -155,7 +157,9 @@ const AIRecommendations = ({ applicationId, candidateName }) => {
               <h4 className="font-semibold text-orange-700 mb-2">⚠️ Areas of Concern</h4>
               <ul className="space-y-1">
                 {recommendation.concerns.map((concern, index) => (
-                  <li key={index} className="text-sm text-gray-700">• {concern}</li>
+                  <li key={index} className="text-sm text-gray-700">
+                    • {typeof concern === 'object' ? `${concern.skill} (${concern.priority} priority)` : concern}
+                  </li>
                 ))}
               </ul>
             </div>
