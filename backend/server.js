@@ -16,10 +16,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/jobs', require('./routes/jobs'));
-app.use('/api/applications', require('./routes/applications'));
+// Use redesigned routes
+app.use('/api/jobs', require('./routes/jobs_redesigned'));
+app.use('/api/applications', require('./routes/applications_redesigned'));
 app.use('/api/tests', require('./routes/tests'));
-app.use('/api/insights', require('./routes/insights'));
+app.use('/api/insights', require('./routes/insights_redesigned'));
 app.use('/api/erd', require('./routes/erd_compliant'));
 app.use('/api/ai-recommendations', require('./routes/aiRecommendations'));
 
