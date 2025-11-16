@@ -92,25 +92,41 @@ export default function RecruiterDashboard() {
     const weights = weightageConfig[experienceLevel] || weightageConfig.mid;
     const weightedResumeScore = (aiScore * weights.resume_weight) / 100;
     const weightedTestScore = (testScore * weights.test_weight) / 100;
-    const compositeFitScore = Math.round(weightedResumeScore + weightedTestScore);
+    const compositeFitScore = (weightedResumeScore + weightedTestScore).toFixed(1);
     
     return {
       composite_fit_score: compositeFitScore,
       experience_level: experienceLevel,
       weightage: weights,
       breakdown: {
-        weighted_resume_score: Math.round(weightedResumeScore),
-        weighted_test_score: Math.round(weightedTestScore)
+        weighted_resume_score: weightedResumeScore.toFixed(1),
+        weighted_test_score: weightedTestScore.toFixed(1)
       }
     };
   };
 
   // Calculate statistics
   const totalApplications = applications.length;
-  const eligibleApplications = applications.filter(app => app.status === 'eligible' || app.status === 'test_completed').length;
+  
+  // NEW DEFINITION: Eligible = AI score >= job threshold AND test passed (score >= 70)
+  const eligibleApplications = applications.filter(app => {
+    // Must have completed test and passed it
+    return app.status === 'test_completed' && app.test_score >= 70;
+  }).length;
+  
   const completedTests = applications.filter(app => app.status === 'test_completed').length;
+  
+  // For status distribution - actual statuses from data
+  const testCompletedPassed = applications.filter(app => app.status === 'test_completed' && app.test_score >= 70).length;
+  const testCompletedFailed = applications.filter(app => app.status === 'test_completed' && app.test_score < 70).length;
+  const notEligible = applications.filter(app => app.status === 'not_eligible').length;
+  
   const averageAIScore = applications.length > 0 
     ? Math.round(applications.reduce((sum, app) => sum + (app.ai_score || 0), 0) / applications.length)
+    : 0;
+  
+  const averageTestScore = completedTests > 0
+    ? Math.round(applications.filter(app => app.test_score).reduce((sum, app) => sum + (app.test_score || 0), 0) / completedTests)
     : 0;
 
   return (
@@ -137,30 +153,83 @@ export default function RecruiterDashboard() {
           </div>
         )}
 
-        {/* Statistics Cards */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Total Jobs</h3>
-            <p className="text-3xl font-bold text-blue-600">{jobs.length}</p>
-            <p className="text-sm text-green-600">+2 this month</p>
+        {/* 1. Total Overview Cards */}
+        <div className="grid md:grid-cols-5 gap-6 mb-8">
+          {/* Total Jobs */}
+          <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-600">Total Jobs</h3>
+              <span className="text-2xl">💼</span>
+            </div>
+            <p className="text-4xl font-bold text-blue-600 mb-1">{jobs.length}</p>
+            <p className="text-xs text-gray-500">Active job postings</p>
           </div>
           
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Total Applications</h3>
-            <p className="text-3xl font-bold text-green-600">{totalApplications}</p>
-            <p className="text-sm text-green-600">+{Math.floor(totalApplications * 0.3)} this week</p>
+          {/* Total Candidates Applied */}
+          <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-600">Total Candidates</h3>
+              <span className="text-2xl">👥</span>
+            </div>
+            <p className="text-4xl font-bold text-green-600 mb-1">{totalApplications}</p>
+            <p className="text-xs text-gray-500">Applied across all jobs</p>
           </div>
           
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Eligible Candidates</h3>
-            <p className="text-3xl font-bold text-purple-600">{eligibleApplications}</p>
-            <p className="text-sm text-gray-600">{Math.round((eligibleApplications/totalApplications)*100)}% pass rate</p>
+          {/* Eligible Candidates - NEW DEFINITION */}
+          <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow group relative">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-600 cursor-help border-b border-dotted border-gray-400">
+                Eligible Candidates
+              </h3>
+              <span className="text-2xl">✅</span>
+            </div>
+            <p className="text-4xl font-bold text-purple-600 mb-1">{eligibleApplications}</p>
+            <p className="text-xs text-gray-500">{totalApplications > 0 ? Math.round((eligibleApplications/totalApplications)*100) : 0}% of total</p>
+            
+            {/* Tooltip */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-3 px-4 w-64 z-10 shadow-xl">
+              <p className="font-semibold mb-1">Eligible Candidates Definition:</p>
+              <p>Candidates whose AI score met the job threshold AND who passed the job-specific assessment (test score ≥ 70%).</p>
+              <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+            </div>
           </div>
           
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Avg AI Score</h3>
-            <p className="text-3xl font-bold text-orange-600">{averageAIScore}%</p>
-            <p className="text-sm text-gray-600">Market: 75%</p>
+          {/* Average AI Score */}
+          <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow group relative">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-600 cursor-help border-b border-dotted border-gray-400">
+                Avg AI Score
+              </h3>
+              <span className="text-2xl">🤖</span>
+            </div>
+            <p className="text-4xl font-bold text-orange-600 mb-1">{averageAIScore}%</p>
+            <p className="text-xs text-gray-500">Resume screening score</p>
+            
+            {/* Tooltip */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-3 px-4 w-64 z-10 shadow-xl">
+              <p className="font-semibold mb-1">AI Score Calculation:</p>
+              <p>Average AI resume screening score across all candidates. Evaluates skills match, experience, and qualifications.</p>
+              <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+            </div>
+          </div>
+          
+          {/* Average Test Score */}
+          <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow group relative">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-600 cursor-help border-b border-dotted border-gray-400">
+                Avg Test Score
+              </h3>
+              <span className="text-2xl">📝</span>
+            </div>
+            <p className="text-4xl font-bold text-indigo-600 mb-1">{averageTestScore}%</p>
+            <p className="text-xs text-gray-500">For {completedTests} tested</p>
+            
+            {/* Tooltip */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-3 px-4 w-64 z-10 shadow-xl">
+              <p className="font-semibold mb-1">Test Score Calculation:</p>
+              <p>Average score for candidates who completed job-specific technical assessments. Passing threshold is 70%.</p>
+              <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+            </div>
           </div>
         </div>
 
@@ -171,9 +240,9 @@ export default function RecruiterDashboard() {
             <h2 className="text-xl font-semibold mb-4">Application Status Distribution</h2>
             <div className="space-y-4">
               {[
-                { status: 'Test Completed', count: completedTests, color: 'bg-green-600', percentage: Math.round((completedTests/totalApplications)*100) },
-                { status: 'Eligible for Test', count: eligibleApplications - completedTests, color: 'bg-blue-600', percentage: Math.round(((eligibleApplications - completedTests)/totalApplications)*100) },
-                { status: 'Not Eligible', count: totalApplications - eligibleApplications, color: 'bg-red-600', percentage: Math.round(((totalApplications - eligibleApplications)/totalApplications)*100) }
+                { status: 'Test Passed (≥70%)', count: testCompletedPassed, color: 'bg-green-600', percentage: totalApplications > 0 ? Math.round((testCompletedPassed/totalApplications)*100) : 0 },
+                { status: 'Test Failed (<70%)', count: testCompletedFailed, color: 'bg-yellow-600', percentage: totalApplications > 0 ? Math.round((testCompletedFailed/totalApplications)*100) : 0 },
+                { status: 'Not Eligible (Low AI Score)', count: notEligible, color: 'bg-red-600', percentage: totalApplications > 0 ? Math.round((notEligible/totalApplications)*100) : 0 }
               ].map((item, index) => (
                 <div key={index}>
                   <div className="flex justify-between items-center mb-2">
@@ -226,21 +295,28 @@ export default function RecruiterDashboard() {
                   <th className="text-left py-3">Eligible Rate</th>
                   <th className="text-left py-3">Avg AI Score</th>
                   <th className="text-left py-3">Avg Test Score</th>
-                  <th className="text-left py-3">Performance</th>
+                  <th className="text-left py-3">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {jobs.map((job) => {
-                  const jobApplications = applications.filter(app => app.job_id === job.id);
+                  const jobApplications = applications.filter(app => app.role_id === job.id);
                   const eligibleCount = jobApplications.filter(app => app.status === 'eligible' || app.status === 'test_completed').length;
-                  const avgAIScore = jobApplications.length > 0 ? Math.round(jobApplications.reduce((sum, app) => sum + app.ai_score, 0) / jobApplications.length) : 0;
+                  const avgAIScore = jobApplications.length > 0 ? Math.round(jobApplications.reduce((sum, app) => sum + (app.ai_score || 0), 0) / jobApplications.length) : 0;
                   const testScores = jobApplications.filter(app => app.test_score).map(app => app.test_score);
                   const avgTestScore = testScores.length > 0 ? Math.round(testScores.reduce((sum, score) => sum + score, 0) / testScores.length) : 0;
                   const eligibleRate = jobApplications.length > 0 ? Math.round((eligibleCount / jobApplications.length) * 100) : 0;
                   
                   return (
-                    <tr key={job.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 font-medium">{job.title}</td>
+                    <tr key={job.id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => window.location.href = `/recruiter/jobs/${job.id}/candidates`}>
+                      <td className="py-3 font-medium">
+                        <Link 
+                          href={`/recruiter/jobs/${job.id}/candidates`}
+                          className="text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          {job.title}
+                        </Link>
+                      </td>
                       <td className="py-3">{jobApplications.length}</td>
                       <td className="py-3">
                         <span className={`px-2 py-1 rounded text-sm ${
@@ -253,11 +329,8 @@ export default function RecruiterDashboard() {
                       <td className="py-3">{avgAIScore}%</td>
                       <td className="py-3">{avgTestScore > 0 ? `${avgTestScore}%` : '-'}</td>
                       <td className="py-3">
-                        <span className={`px-2 py-1 rounded text-sm ${
-                          avgAIScore >= 80 ? 'bg-green-100 text-green-800' : 
-                          avgAIScore >= 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {avgAIScore >= 80 ? 'Excellent' : avgAIScore >= 60 ? 'Good' : 'Needs Review'}
+                        <span className="text-blue-600 hover:text-blue-800">
+                          View Candidates →
                         </span>
                       </td>
                     </tr>
@@ -268,18 +341,57 @@ export default function RecruiterDashboard() {
           </div>
         </div>
 
+        {/* 2. Candidate Skill Insights - Section Heading */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">🎯 Candidate Skill Insights</h2>
+          <p className="text-sm text-gray-600 mb-4">Understand skill strengths and gaps in your candidate pool</p>
+        </div>
+
         {/* Skills Analysis */}
         <div className="grid lg:grid-cols-2 gap-8 mb-8">
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold mb-4">Most In-Demand Skills</h2>
             <div className="space-y-3">
-              {[
-                { skill: 'JavaScript', demand: 95, applications: applications.filter(app => app.ai_insights && app.ai_insights.includes('JavaScript')).length },
-                { skill: 'React', demand: 85, applications: applications.filter(app => app.ai_insights && app.ai_insights.includes('React')).length },
-                { skill: 'Python', demand: 90, applications: applications.filter(app => app.ai_insights && app.ai_insights.includes('Python')).length },
-                { skill: 'Node.js', demand: 78, applications: applications.filter(app => app.ai_insights && app.ai_insights.includes('Node')).length },
-                { skill: 'SQL', demand: 92, applications: applications.filter(app => app.ai_insights && app.ai_insights.includes('SQL')).length }
-              ].map((item, index) => (
+              {(() => {
+                // Extract skills from applications
+                const skillCounts = {};
+                applications.forEach(app => {
+                  if (app.skills_matched) {
+                    try {
+                      const skills = typeof app.skills_matched === 'string' ? JSON.parse(app.skills_matched) : app.skills_matched;
+                      skills.forEach(skill => {
+                        const skillName = typeof skill === 'string' ? skill : skill.skill || skill;
+                        skillCounts[skillName] = (skillCounts[skillName] || 0) + 1;
+                      });
+                    } catch (e) {
+                      // Handle parsing errors
+                    }
+                  }
+                });
+                
+                // Get top 5 skills
+                const topSkills = Object.entries(skillCounts)
+                  .sort(([,a], [,b]) => b - a)
+                  .slice(0, 5)
+                  .map(([skill, count]) => ({
+                    skill,
+                    demand: Math.min(95, Math.round((count / applications.length) * 100) + 60),
+                    applications: count
+                  }));
+                
+                // Fallback if no skills found
+                if (topSkills.length === 0) {
+                  return [
+                    { skill: 'Network Security', demand: 95, applications: Math.floor(applications.length * 0.7) },
+                    { skill: 'SIEM', demand: 85, applications: Math.floor(applications.length * 0.6) },
+                    { skill: 'Incident Response', demand: 90, applications: Math.floor(applications.length * 0.65) },
+                    { skill: 'Penetration Testing', demand: 78, applications: Math.floor(applications.length * 0.5) },
+                    { skill: 'Cloud Security', demand: 92, applications: Math.floor(applications.length * 0.55) }
+                  ];
+                }
+                
+                return topSkills;
+              })().map((item, index) => (
                 <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
                   <div>
                     <span className="font-medium">{item.skill}</span>
@@ -300,14 +412,64 @@ export default function RecruiterDashboard() {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4">Common Skill Gaps</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Common Skill Gaps</h2>
+              <div className="group relative">
+                <span className="text-gray-400 hover:text-gray-600 cursor-help text-xl">ℹ️</span>
+                <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-3 px-4 w-72 z-10 shadow-xl">
+                  <p className="font-semibold mb-2">Priority Level Calculation:</p>
+                  <ul className="space-y-1">
+                    <li>🔴 <span className="font-semibold">High Priority:</span> &gt;30% of candidates missing this skill</li>
+                    <li>🟡 <span className="font-semibold">Medium Priority:</span> 15-30% of candidates missing this skill</li>
+                    <li>🟢 <span className="font-semibold">Low Priority:</span> &lt;15% of candidates missing this skill</li>
+                  </ul>
+                  <p className="mt-2 text-gray-300 italic">Higher percentages indicate more widespread skill gaps requiring attention.</p>
+                  <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
+            </div>
             <div className="space-y-3">
-              {[
-                { skill: 'TypeScript', gap: 'High', count: 3, priority: 'bg-red-100 text-red-800' },
-                { skill: 'AWS/Cloud', gap: 'Medium', count: 2, priority: 'bg-yellow-100 text-yellow-800' },
-                { skill: 'Docker', gap: 'Medium', count: 2, priority: 'bg-yellow-100 text-yellow-800' },
-                { skill: 'Testing', gap: 'Low', count: 1, priority: 'bg-green-100 text-green-800' }
-              ].map((item, index) => (
+              {(() => {
+                // Extract skill gaps from applications
+                const gapCounts = {};
+                applications.forEach(app => {
+                  if (app.skill_gaps) {
+                    try {
+                      const gaps = typeof app.skill_gaps === 'string' ? JSON.parse(app.skill_gaps) : app.skill_gaps;
+                      gaps.forEach(gap => {
+                        const gapName = typeof gap === 'string' ? gap : gap.skill || gap;
+                        gapCounts[gapName] = (gapCounts[gapName] || 0) + 1;
+                      });
+                    } catch (e) {
+                      // Handle parsing errors
+                    }
+                  }
+                });
+                
+                // Get top 4 skill gaps
+                const topGaps = Object.entries(gapCounts)
+                  .sort(([,a], [,b]) => b - a)
+                  .slice(0, 4)
+                  .map(([skill, count]) => ({
+                    skill,
+                    gap: count > applications.length * 0.3 ? 'High' : count > applications.length * 0.15 ? 'Medium' : 'Low',
+                    count,
+                    priority: count > applications.length * 0.3 ? 'bg-red-100 text-red-800' : 
+                             count > applications.length * 0.15 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
+                  }));
+                
+                // Fallback if no gaps found
+                if (topGaps.length === 0) {
+                  return [
+                    { skill: 'Advanced Penetration Testing', gap: 'High', count: Math.floor(applications.length * 0.4), priority: 'bg-red-100 text-red-800' },
+                    { skill: 'Cloud Security (AWS/Azure)', gap: 'Medium', count: Math.floor(applications.length * 0.25), priority: 'bg-yellow-100 text-yellow-800' },
+                    { skill: 'DevSecOps', gap: 'Medium', count: Math.floor(applications.length * 0.2), priority: 'bg-yellow-100 text-yellow-800' },
+                    { skill: 'Threat Intelligence', gap: 'Low', count: Math.floor(applications.length * 0.1), priority: 'bg-green-100 text-green-800' }
+                  ];
+                }
+                
+                return topGaps;
+              })().map((item, index) => (
                 <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
                   <div>
                     <span className="font-medium">{item.skill}</span>
@@ -394,60 +556,7 @@ export default function RecruiterDashboard() {
           )}
         </div>
 
-        {/* Hiring Trends & Insights */}
-        <div className="grid lg:grid-cols-2 gap-8 mb-8">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4">📈 Hiring Trends</h2>
-            <div className="space-y-4">
-              <div className="border-l-4 border-green-500 pl-4">
-                <h3 className="font-semibold text-green-700">Application Volume</h3>
-                <p className="text-2xl font-bold text-green-600">+{Math.floor(totalApplications * 0.25)}%</p>
-                <p className="text-sm text-gray-600">Increase from last month</p>
-              </div>
-              
-              <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold text-blue-700">Quality Score</h3>
-                <p className="text-2xl font-bold text-blue-600">{averageAIScore}%</p>
-                <p className="text-sm text-gray-600">Average candidate quality</p>
-              </div>
-              
-              <div className="border-l-4 border-purple-500 pl-4">
-                <h3 className="font-semibold text-purple-700">Time to Hire</h3>
-                <p className="text-2xl font-bold text-purple-600">12 days</p>
-                <p className="text-sm text-gray-600">Average hiring cycle</p>
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4">🎯 Recruitment Insights</h2>
-            <div className="space-y-3">
-              <div className="p-3 bg-green-50 rounded-lg">
-                <h4 className="font-semibold text-green-800">Best Performing Job</h4>
-                <p className="text-sm text-green-700">
-                  {jobs.length > 0 ? jobs.reduce((best, job) => {
-                    const jobApps = applications.filter(app => app.job_id === job.id);
-                    const bestApps = applications.filter(app => app.job_id === best.id);
-                    return jobApps.length > bestApps.length ? job : best;
-                  }).title : 'No jobs yet'}
-                </p>
-                <p className="text-xs text-gray-600">Highest application rate</p>
-              </div>
-              
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <h4 className="font-semibold text-blue-800">Top Skill Match</h4>
-                <p className="text-sm text-blue-700">JavaScript & React</p>
-                <p className="text-xs text-gray-600">Most common in qualified candidates</p>
-              </div>
-              
-              <div className="p-3 bg-yellow-50 rounded-lg">
-                <h4 className="font-semibold text-yellow-800">Improvement Area</h4>
-                <p className="text-sm text-yellow-700">Cloud Skills (AWS/Azure)</p>
-                <p className="text-xs text-gray-600">Common gap in applications</p>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Top Candidates */}
         <div className="bg-white rounded-lg shadow-md p-6">
@@ -459,16 +568,22 @@ export default function RecruiterDashboard() {
             <div className="space-y-4">
               {applications
                 .filter(app => app.status === 'test_completed')
-                .sort((a, b) => ((b.ai_score + (b.test_score || 0)) / 2) - ((a.ai_score + (a.test_score || 0)) / 2))
-                .slice(0, 5)
                 .map((application) => {
-                  // Determine experience level and calculate weighted composite score
+                  // Calculate weighted score for each application
                   const experienceLevel = determineExperienceLevel(application.job_title);
                   const weightedScore = calculateWeightedScore(
                     application.ai_score, 
                     application.test_score || 0, 
                     experienceLevel
                   );
+                  return {
+                    ...application,
+                    weightedScore
+                  };
+                })
+                .sort((a, b) => parseFloat(b.weightedScore.composite_fit_score) - parseFloat(a.weightedScore.composite_fit_score))
+                .slice(0, 5)
+                .map((application) => {
                   return (
                     <div key={application.id} className="flex justify-between items-center p-4 border rounded-lg hover:bg-gray-50">
                       <div>
@@ -476,19 +591,19 @@ export default function RecruiterDashboard() {
                         <p className="text-sm text-gray-600">{application.job_title}</p>
                         <div className="flex gap-2 mt-1">
                           <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                            AI: {application.ai_score}%
+                            AI: {typeof application.ai_score === 'number' ? application.ai_score.toFixed(1) : application.ai_score}%
                           </span>
                           {application.test_score && (
                             <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                              Test: {application.test_score}%
+                              Test: {typeof application.test_score === 'number' ? application.test_score.toFixed(1) : application.test_score}%
                             </span>
                           )}
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-2xl font-bold text-purple-600">{weightedScore.composite_fit_score}</div>
+                        <div className="text-2xl font-bold text-purple-600">{application.weightedScore.composite_fit_score}</div>
                         <div className="text-xs text-gray-500">
-                          {weightedScore.experience_level} ({weightedScore.weightage.resume_weight}%R + {weightedScore.weightage.test_weight}%T)
+                          {application.weightedScore.experience_level} ({application.weightedScore.weightage.resume_weight}%R + {application.weightedScore.weightage.test_weight}%T)
                         </div>
                         <Link 
                           href={`/recruiter/applications/${application.id}`}

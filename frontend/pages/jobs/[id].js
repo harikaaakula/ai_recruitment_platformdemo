@@ -13,6 +13,7 @@ export default function JobDetails() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [applicationResult, setApplicationResult] = useState(null);
+  const [suggestions, setSuggestions] = useState(null);
   
   const [formData, setFormData] = useState({
     candidate_name: '',
@@ -59,7 +60,7 @@ export default function JobDetails() {
     setSuccess('');
 
     const submitData = new FormData();
-    submitData.append('job_id', id);
+    submitData.append('role_id', id);
     submitData.append('candidate_name', formData.candidate_name);
     submitData.append('candidate_email', formData.candidate_email);
     submitData.append('candidate_phone', formData.candidate_phone);
@@ -68,6 +69,7 @@ export default function JobDetails() {
     try {
       const response = await applicationsAPI.apply(submitData);
       setApplicationResult(response.data.application);
+      setSuggestions(response.data.suggestions); // Store AI suggestions
       setSuccess('Application submitted successfully!');
       
       // Reset form
@@ -170,6 +172,37 @@ export default function JobDetails() {
                 >
                   Take Skill Assessment
                 </a>
+              </div>
+            )}
+
+            {/* Personalized AI Suggestions */}
+            {suggestions && suggestions.suggestions && suggestions.suggestions.length > 0 && (
+              <div className="mt-6">
+                <h3 className="font-semibold mb-3 flex items-center">
+                  <span className="text-xl mr-2">💡</span>
+                  {suggestions.isEligible ? 'Test Preparation Tips' : 'Suggestions for Improvement'}
+                </h3>
+                <div className={`p-4 rounded-lg ${
+                  suggestions.isEligible ? 'bg-blue-50 border border-blue-200' : 'bg-orange-50 border border-orange-200'
+                }`}>
+                  <p className={`text-sm font-medium mb-3 ${
+                    suggestions.isEligible ? 'text-blue-800' : 'text-orange-800'
+                  }`}>
+                    {suggestions.message}
+                  </p>
+                  <ul className="space-y-2">
+                    {suggestions.suggestions.map((suggestion, index) => (
+                      <li key={index} className={`text-sm flex items-start ${
+                        suggestions.isEligible ? 'text-blue-700' : 'text-orange-700'
+                      }`}>
+                        <span className="mr-2 mt-1">
+                          {suggestions.isEligible ? '✓' : '→'}
+                        </span>
+                        <span>{suggestion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             )}
 

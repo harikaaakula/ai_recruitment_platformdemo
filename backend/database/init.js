@@ -72,6 +72,10 @@ db.serialize(() => {
       test_completed_at DATETIME,
       test_duration INTEGER,
       answers TEXT,
+      verified_skills TEXT,
+      unverified_skills TEXT,
+      untested_skills TEXT,
+      verification_details TEXT,
       FOREIGN KEY (analysis_id) REFERENCES resume_analysis_table (analysis_id)
     )
   `);

@@ -9,11 +9,21 @@ node_modules/
 .env.test.local
 .env.production.local
 
-# Database
-backend/database/recruitment.db
+# Database (keeping with data for demo)
+# backend/database/recruitment.db
 
-# Uploads
-backend/uploads/
+# Generated CSV data (optional - uncomment to ignore)
+# generated_candidates.csv
+# generated_applications.csv
+# generated_tests.csv
+
+# Generated JSON backup
+backend/data/generated_candidates.json
+
+# Uploads (keep folder structure, ignore uploaded files)
+backend/uploads/*.pdf
+backend/uploads/*.doc
+backend/uploads/*.docx
 
 # Next.js
 frontend/.next/

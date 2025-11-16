@@ -1,75 +1,82 @@
 const express = require('express');
 const db = require('../database/init');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const jobRoles = require('../data/jobRoles');
 
 const router = express.Router();
 
-// Get all jobs (public) - Redesigned ERD
+// Get all jobs (public) - Using hardcoded jobs from jobRoles.js
 router.get('/', (req, res) => {
-  db.all(`
-    SELECT 
-      jr.role_id as id, 
-      jr.title, 
-      jr.description, 
-      jr.requirements,
-      jr.min_ai_threshold as threshold_score, 
-      jr.salary_min,
-      jr.salary_max,
-      jr.status,
-      jr.recruiter_id, 
-      jr.created_at,
-      u.name as recruiter_name,
-      COUNT(a.application_id) as application_count
-    FROM job_roles jr 
-    JOIN users u ON jr.recruiter_id = u.id 
-    LEFT JOIN applications a ON jr.role_id = a.role_id
-    WHERE jr.status = 'active'
-    GROUP BY jr.role_id
-    ORDER BY jr.created_at DESC
-  `, (err, jobs) => {
-    if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json(jobs);
-  });
+  console.log('📋 Serving hardcoded jobs from jobRoles.js');
+  
+  // Return ATS job roles with compatibility fields
+  const jobs = jobRoles.map(job => ({
+    id: job.id,
+    title: job.title,
+    description: job.overview, // Use overview as description
+    requirements: `Tasks: ${job.tasks.join(', ')}. Knowledge: ${job.knowledge.join(', ')}. Skills: ${job.skills.join(', ')}.`,
+    threshold_score: job.thresholdScore || 60,
+    salary_min: 70000, // Default salary
+    salary_max: 120000,
+    status: 'active',
+    recruiter_id: 1,
+    created_at: new Date().toISOString(),
+    recruiter_name: 'HR Department',
+    application_count: 0,
+    // ATS-specific fields
+    overview: job.overview,
+    tasks: job.tasks,
+    knowledge: job.knowledge,
+    skills: job.skills,
+    experienceRange: job.experienceRange,
+    weights: job.weights,
+    test_category: job.title.toLowerCase().replace(/\s+/g, '_')
+  }));
+  
+  console.log(`✅ Returning ${jobs.length} hardcoded jobs`);
+  res.json(jobs);
 });
 
-// Get job by ID - Redesigned ERD
+// Get job by ID - Using hardcoded jobs
 router.get('/:id', (req, res) => {
   const { id } = req.params;
+  console.log(`🔍 Looking for hardcoded job with ID: ${id}`);
   
-  db.get(`
-    SELECT 
-      jr.role_id as id, 
-      jr.title, 
-      jr.description, 
-      jr.requirements,
-      jr.min_ai_threshold as threshold_score, 
-      jr.salary_min,
-      jr.salary_max,
-      jr.status,
-      jr.recruiter_id, 
-      jr.created_at,
-      u.name as recruiter_name,
-      COUNT(a.application_id) as application_count
-    FROM job_roles jr 
-    JOIN users u ON jr.recruiter_id = u.id 
-    LEFT JOIN applications a ON jr.role_id = a.role_id
-    WHERE jr.role_id = ?
-    GROUP BY jr.role_id
-  `, [id], (err, job) => {
-    if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    
-    if (!job) {
-      return res.status(404).json({ error: 'Job not found' });
-    }
-    
-    res.json(job);
-  });
+  // Find job in hardcoded array (id can be string or number)
+  const job = jobRoles.find(j => j.id == id || j.id === parseInt(id));
+  
+  if (!job) {
+    console.log(`❌ Job not found with ID: ${id}`);
+    return res.status(404).json({ error: 'Job not found' });
+  }
+  
+  console.log(`✅ Found job: ${job.title}`);
+  
+  // Return ATS job with compatibility fields
+  const jobData = {
+    id: job.id,
+    title: job.title,
+    description: job.overview,
+    requirements: `Tasks: ${job.tasks.join(', ')}. Knowledge: ${job.knowledge.join(', ')}. Skills: ${job.skills.join(', ')}.`,
+    threshold_score: job.thresholdScore || 60,
+    salary_min: 70000,
+    salary_max: 120000,
+    status: 'active',
+    recruiter_id: 1,
+    created_at: new Date().toISOString(),
+    recruiter_name: 'HR Department',
+    application_count: 0,
+    // ATS-specific fields
+    overview: job.overview,
+    tasks: job.tasks,
+    knowledge: job.knowledge,
+    skills: job.skills,
+    experienceRange: job.experienceRange,
+    weights: job.weights,
+    test_category: job.title.toLowerCase().replace(/\s+/g, '_')
+  };
+  
+  res.json(jobData);
 });
 
 // Create job (recruiter only) - Redesigned ERD
