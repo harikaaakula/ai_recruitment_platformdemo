@@ -38,23 +38,12 @@ export default function Home() {
           <div className="bg-white p-8 rounded-lg shadow-md">
             <h2 className="text-2xl font-semibold mb-4 text-green-600">For Candidates</h2>
             <p className="text-gray-600 mb-6">
-              Access comprehensive market insights including salary benchmarking, job trends, 
-              skills in demand, and personalized career recommendations.
+              Browse and apply for cybersecurity job opportunities. Upload your resume, 
+              take skill assessments, and get matched with roles that fit your expertise.
             </p>
-            {isAuthenticated && !isRecruiter ? (
-              <div className="space-y-3">
-                <Link href="/candidate/insights" className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 inline-block w-full text-center">
-                  View Market Insights
-                </Link>
-                <Link href="/jobs" className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 inline-block w-full text-center">
-                  Browse Jobs
-                </Link>
-              </div>
-            ) : (
-              <Link href="/jobs" className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 inline-block">
-                View Jobs
-              </Link>
-            )}
+            <Link href="/jobs" className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 inline-block">
+              Browse Jobs
+            </Link>
           </div>
         </div>
 
