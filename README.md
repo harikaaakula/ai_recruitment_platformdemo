@@ -684,8 +684,8 @@ Frontend will start on http://localhost:3000
 #### 7. Login as Recruiter
 
 **Default Credentials:**
-- Email: `recruiter@example.com`
-- Password: `password123`
+- Email: `hr@cybersec.com`
+- Password: `recruiter123`
 
 ### Verification
 
