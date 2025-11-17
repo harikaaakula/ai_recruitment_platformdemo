@@ -1,4 +1,4 @@
-# 🤖 AI-Powered Recruitment Platform
+# AI-Powered Recruitment Platform
 
 An intelligent recruitment system that uses AI to analyze resumes, score candidates, verify skills through automated tests, and provide actionable insights to recruiters.
 
@@ -6,27 +6,27 @@ An intelligent recruitment system that uses AI to analyze resumes, score candida
 
 ## � Table of Contents
 
-- [📋 Overview](#-overview)
-- [🏗️ System Architecture](#️-system-architecture)
-- [📊 Recruiter Dashboard Features](#-recruiter-dashboard-features)
-- [🎯 Job-Specific Page Features](#-job-specific-page-features)
-- [👤 Candidate Profile Page Features](#-candidate-profile-page-features)
-- [🔄 Candidate Application Flow](#-candidate-application-flow)
-- [📦 Dummy Data Generation](#-dummy-data-generation)
-- [📁 Project Structure](#-project-structure)
-- [🚀 How to Run Locally](#-how-to-run-locally)
-- [🔐 Environment Variables](#-environment-variables)
-- [📸 Screenshots](#-screenshots)
-- [🧪 Testing the System](#-testing-the-system)
-- [🔧 Troubleshooting](#-troubleshooting)
-- [📚 Additional Documentation](#-additional-documentation)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-- [👥 Credits](#-credits)
+- [Overview](#-overview)
+- [System Architecture](#️-system-architecture)
+- [Recruiter Dashboard Features](#-recruiter-dashboard-features)
+- [Job-Specific Page Features](#-job-specific-page-features)
+- [Candidate Profile Page Features](#-candidate-profile-page-features)
+- [Candidate Application Flow](#-candidate-application-flow)
+- [Dummy Data Generation](#-dummy-data-generation)
+- [Project Structure](#-project-structure)
+- [How to Run Locally](#-how-to-run-locally)
+- [Environment Variables](#-environment-variables)
+- [Screenshots](#-screenshots)
+- [Testing the System](#-testing-the-system)
+- [Troubleshooting](#-troubleshooting)
+- [Additional Documentation](#-additional-documentation)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Credits](#-credits)
 
 ---
 
-## 📋 Overview
+## Overview
 
 The AI-Powered Recruitment Platform streamlines the hiring process by automatically:
 - **Parsing resumes** to extract candidate information, skills, education, and certifications
@@ -39,7 +39,7 @@ The platform features a comprehensive recruiter dashboard with real-time insight
 
 ---
 
-## 🏗️ System Architecture
+##  System Architecture
 
 ### Technology Stack
 
@@ -97,29 +97,29 @@ Recruiter View Flow:
 
 ### Overview Cards (Top Row)
 
-#### 1. Total Jobs 💼
+#### 1. Total Jobs 
 - **What it shows**: Number of active job postings
 - **Calculation**: `COUNT(*) FROM job_role_table WHERE status = 'active'`
 - **Data source**: `job_role_table` table
 
-#### 2. Total Candidates 👥
+#### 2. Total Candidates 
 - **What it shows**: Total applications across all jobs
 - **Calculation**: `COUNT(*) FROM application_table`
 - **Data source**: `application_table` table
 
-#### 3. Eligible Candidates ✅
+#### 3. Eligible Candidates 
 - **What it shows**: Candidates who passed both AI screening AND skill test
 - **Calculation**: `COUNT(*) WHERE status = 'test_completed' AND test_score >= 70`
 - **Tooltip**: "Candidates whose AI score met the job threshold AND who passed the job-specific assessment (test score ≥ 70%)"
 - **Data source**: `application_table` + `assessment_test_table` tables
 
-#### 4. Average AI Score 🤖
+#### 4. Average AI Score 
 - **What it shows**: Mean AI resume screening score across all candidates
 - **Calculation**: `AVG(ai_score) FROM resume_ai_analysis_table`
 - **Tooltip**: "Average AI resume screening score across all candidates. Evaluates skills match, experience, and qualifications"
 - **Data source**: `resume_ai_analysis_table` table
 
-#### 5. Average Test Score 📝
+#### 5. Average Test Score 
 - **What it shows**: Mean test score for candidates who completed assessments
 - **Calculation**: `AVG(test_score) FROM assessment_test_table WHERE test_score IS NOT NULL`
 - **Tooltip**: "Average score for candidates who completed job-specific technical assessments. Passing threshold is 70%"
@@ -223,7 +223,7 @@ Recruiter View Flow:
 
 ---
 
-## 🎯 Job-Specific Page Features
+## Job-Specific Page Features
 
 **URL**: `/recruiter/jobs/[jobId]/candidates`
 
@@ -274,15 +274,15 @@ Recruiter View Flow:
 
 **Expandable Rows:**
 Clicking "Details" shows skill verification grid:
-- ✅ **Verified Skills** (green): Skills proven through test
-- ❌ **Unverified Skills** (red): Claimed but not demonstrated
-- ⚠️ **Untested Skills** (yellow): Not covered by test questions
+-  **Verified Skills** (green): Skills proven through test
+- **Unverified Skills** (red): Claimed but not demonstrated
+- **Untested Skills** (yellow): Not covered by test questions
 
 **Data source**: `application_table` filtered by `role_id`, joined with all related tables
 
 ---
 
-## 👤 Candidate Profile Page Features
+## Candidate Profile Page Features
 
 **URL**: `/recruiter/applications/[id]`
 
@@ -350,7 +350,7 @@ Three-column grid showing:
 
 ---
 
-## 🔄 Candidate Application Flow
+## Candidate Application Flow
 
 ### Step-by-Step Process
 
@@ -450,7 +450,7 @@ All views update automatically:
 
 ---
 
-## 📦 Dummy Data Generation
+## Dummy Data Generation
 
 ### Overview
 The system includes 1,086 pre-generated applications to demonstrate functionality without requiring manual data entry.
@@ -519,7 +519,7 @@ The system includes 1,086 pre-generated applications to demonstrate functionalit
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 sampleproject/
@@ -614,7 +614,7 @@ sampleproject/
 
 ---
 
-## 🚀 How to Run Locally
+##  How to Run Locally
 
 ### Prerequisites
 
@@ -697,7 +697,7 @@ After starting both servers:
 
 ---
 
-## 🔐 Environment Variables
+## Environment Variables
 
 ### Required Variables
 
@@ -725,7 +725,7 @@ After starting both servers:
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 <!-- TODO: Add screenshots here -->
 
@@ -743,7 +743,7 @@ After starting both servers:
 
 ---
 
-## 🧪 Testing the System
+##  Testing the System
 
 ### Test Candidate Application
 
@@ -782,7 +782,7 @@ SKILLS
 
 ---
 
-## 🔧 Troubleshooting
+##  Troubleshooting
 
 ### Backend won't start
 - Check if port 5001 is available
@@ -811,7 +811,7 @@ SKILLS
 
 ---
 
-## 📚 Additional Documentation
+##  Additional Documentation
 
 ### API Endpoints
 
@@ -849,7 +849,7 @@ SKILLS
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 This is a demonstration project. For production use, consider:
 - Adding user registration flow
@@ -862,13 +862,13 @@ This is a demonstration project. For production use, consider:
 
 ---
 
-## 📄 License
+## License
 
 This project is for demonstration purposes.
 
 ---
 
-## 👥 Credits
+##  Credits
 
 Built as an AI-powered recruitment platform demonstration showcasing:
 - Resume parsing and analysis
@@ -878,6 +878,10 @@ Built as an AI-powered recruitment platform demonstration showcasing:
 
 ---
 
-**Last Updated**: November 16, 2025  
-**Version**: 1.0  
-**Status**: Production Ready ✅
+## Contributors 
+- Harika Aakula
+- Keerthi Vaddepalli
+- Rohit Reddy Chinthala
+- Naresh Arepalli
+
+
