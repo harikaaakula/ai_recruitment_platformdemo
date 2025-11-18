@@ -435,6 +435,8 @@ router.get('/job/:jobId', authenticateToken, requireRole('recruiter'), (req, res
       ai.skills_matched,
       ai.skill_gaps,
       t.test_score,
+      t.completed_at as test_completed_at,
+      t.started_at as test_started_at,
       t.verified_skills,
       t.unverified_skills,
       t.untested_skills,

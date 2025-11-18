@@ -71,16 +71,35 @@ export default function RecruiterDashboard() {
     );
   }
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status, testScore) => {
+    // Check if test score actually exists (not null, undefined, 0, or empty string)
+    const hasTestScore = testScore !== null && testScore !== undefined && testScore !== '' && testScore !== 0;
+    
+    if (status === 'test_completed' && hasTestScore) {
+      return 'bg-blue-100 text-blue-800'; // Actually completed test
+    }
+    if (status === 'test_completed' && !hasTestScore) {
+      return 'bg-green-100 text-green-800'; // Eligible but not taken test yet
+    }
+    
     switch (status) {
       case 'eligible': return 'bg-green-100 text-green-800';
       case 'not_eligible': return 'bg-red-100 text-red-800';
-      case 'test_completed': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getStatusText = (status) => {
+  const getStatusText = (status, testScore) => {
+    // Check if test score actually exists
+    const hasTestScore = testScore !== null && testScore !== undefined && testScore !== '' && testScore !== 0;
+    
+    if (status === 'test_completed' && hasTestScore) {
+      return 'Test Completed';
+    }
+    if (status === 'test_completed' && !hasTestScore) {
+      return 'Eligible for Test';
+    }
+    
     switch (status) {
       case 'eligible': return 'Eligible for Test';
       case 'not_eligible': return 'Not Eligible';
@@ -799,8 +818,8 @@ export default function RecruiterDashboard() {
                         )}
                       </td>
                       <td className="py-3">
-                        <span className={`px-2 py-1 rounded text-sm font-medium ${getStatusColor(application.status)}`}>
-                          {getStatusText(application.status)}
+                        <span className={`px-2 py-1 rounded text-sm font-medium ${getStatusColor(application.status, application.test_score)}`}>
+                          {getStatusText(application.status, application.test_score)}
                         </span>
                       </td>
                       <td className="py-3 text-sm text-gray-600">

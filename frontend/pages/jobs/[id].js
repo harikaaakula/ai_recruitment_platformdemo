@@ -107,10 +107,7 @@ export default function JobDetails() {
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-md p-8 mb-8">
           <h1 className="text-3xl font-bold mb-4">{job.title}</h1>
-          <p className="text-gray-600 mb-2">Posted by {job.recruiter_name}</p>
-          <p className="text-sm text-gray-500 mb-6">
-            Posted on {new Date(job.created_at).toLocaleDateString()}
-          </p>
+          <p className="text-gray-600 mb-6">Posted by {job.recruiter_name}</p>
           
           <div className="mb-6">
             <span className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full">

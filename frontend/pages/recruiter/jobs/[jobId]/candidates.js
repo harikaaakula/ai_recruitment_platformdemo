@@ -65,11 +65,20 @@ export default function JobCandidates() {
     );
   }
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status, testScore) => {
+    // Check if test score actually exists (not null, undefined, 0, or empty string)
+    const hasTestScore = testScore !== null && testScore !== undefined && testScore !== '' && testScore !== 0;
+    
+    if (status === 'test_completed' && hasTestScore) {
+      return 'bg-blue-100 text-blue-800'; // Actually completed test
+    }
+    if (status === 'test_completed' && !hasTestScore) {
+      return 'bg-green-100 text-green-800'; // Eligible but not taken test yet
+    }
+    
     switch (status) {
       case 'eligible': return 'bg-green-100 text-green-800';
       case 'not_eligible': return 'bg-red-100 text-red-800';
-      case 'test_completed': return 'bg-blue-100 text-blue-800';
       case 'hired': return 'bg-purple-100 text-purple-800';
       case 'rejected': return 'bg-gray-100 text-gray-800';
       case 'under_review': return 'bg-yellow-100 text-yellow-800';
@@ -78,9 +87,19 @@ export default function JobCandidates() {
     }
   };
 
-  const getStatusText = (status) => {
+  const getStatusText = (status, testScore) => {
+    // Check if test score actually exists
+    const hasTestScore = testScore !== null && testScore !== undefined && testScore !== '' && testScore !== 0;
+    
+    if (status === 'test_completed' && hasTestScore) {
+      return 'Test Completed';
+    }
+    if (status === 'test_completed' && !hasTestScore) {
+      return 'Eligible for Test';
+    }
+    
     switch (status) {
-      case 'eligible': return 'Eligible';
+      case 'eligible': return 'Eligible for Test';
       case 'not_eligible': return 'Not Eligible';
       case 'test_completed': return 'Test Completed';
       case 'hired': return 'Hired';
@@ -107,13 +126,25 @@ export default function JobCandidates() {
     }
   });
 
-  // Calculate statistics
+  // Calculate statistics - Hiring Readiness Metrics
   const totalCandidates = candidates.length;
-  const eligibleCandidates = candidates.filter(c => c.status === 'eligible' || c.status === 'test_completed').length;
-  const completedTests = candidates.filter(c => c.status === 'test_completed').length;
-  const avgAIScore = candidates.length > 0 
-    ? Math.round(candidates.reduce((sum, c) => sum + (c.ai_score || 0), 0) / candidates.length)
-    : 0;
+  
+  // Interview Ready: Passed screening AND test (score ≥70%)
+  const interviewReady = candidates.filter(c => 
+    c.status === 'test_completed' && c.test_score >= 70
+  ).length;
+  
+  // High Performers: Test score ≥ 80% (exceptional candidates)
+  const highPerformers = candidates.filter(c => 
+    c.status === 'test_completed' && c.test_score >= 80
+  ).length;
+  
+  // Awaiting Tests: Candidates showing "Eligible for Test" status
+  // This matches the same logic as getStatusText() function
+  const awaitingTests = candidates.filter(c => {
+    const hasTestScore = c.test_score !== null && c.test_score !== undefined && c.test_score !== '' && c.test_score !== 0;
+    return c.status === 'eligible' || (c.status === 'test_completed' && !hasTestScore);
+  }).length;
 
   return (
     <Layout>
@@ -162,7 +193,6 @@ export default function JobCandidates() {
             
             <div className="flex items-center space-x-4 text-sm text-gray-500 pt-4 border-t">
               <span>💰 ${job?.salary_min?.toLocaleString()} - ${job?.salary_max?.toLocaleString()}</span>
-              <span>📅 Posted {new Date(job?.created_at).toLocaleDateString()}</span>
               <span className={`px-2 py-1 rounded text-xs font-medium ${
                 job?.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
               }`}>
@@ -172,42 +202,99 @@ export default function JobCandidates() {
           </div>
         </div>
 
-        {/* Statistics Cards */}
+        {/* Hiring Readiness Metrics */}
+        <div className="mb-4">
+          <h2 className="text-xl font-semibold text-gray-800">🎯 Hiring Readiness</h2>
+          <p className="text-sm text-gray-600">Understand your candidate pool quality and readiness</p>
+        </div>
+        
         <div className="grid md:grid-cols-4 gap-6 mb-6">
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Total Applicants</h3>
-            <p className="text-3xl font-bold text-blue-600">{totalCandidates}</p>
-            <p className="text-sm text-gray-600">For this position</p>
+          {/* Total Applicants */}
+          <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-600">Total Applicants</h3>
+              <span className="text-2xl">👥</span>
+            </div>
+            <p className="text-4xl font-bold text-blue-600 mb-1">{totalCandidates}</p>
+            <p className="text-xs text-gray-500">Applied for this position</p>
           </div>
           
+          {/* Interview Ready */}
           <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow group relative">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-semibold text-gray-700">Screening Passed</h3>
+              <h3 className="text-sm font-semibold text-gray-600">Interview Ready</h3>
               <span className="text-2xl">✅</span>
             </div>
-            <p className="text-3xl font-bold text-green-600">{eligibleCandidates}</p>
-            <p className="text-sm text-gray-600">
-              {totalCandidates > 0 ? Math.round((eligibleCandidates/totalCandidates)*100) : 0}% passed AI screening
+            <p className="text-4xl font-bold text-green-600 mb-1">{interviewReady}</p>
+            <p className="text-xs text-gray-500">
+              {totalCandidates > 0 ? Math.round((interviewReady/totalCandidates)*100) : 0}% qualified for next stage
             </p>
             
             {/* Tooltip */}
             <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-3 px-4 w-72 z-50 shadow-2xl border border-gray-700">
-              <p className="font-semibold mb-2">✅ Screening Passed</p>
-              <p className="mb-2">Candidates whose resumes passed the AI screening process.</p>
-              <p className="text-gray-300">These candidates met the minimum requirements and are eligible to take the assessment test.</p>
+              <p className="font-semibold mb-2 text-sm">✅ Interview Ready</p>
+              <p className="mb-2">Candidates who passed both screening stages:</p>
+              <div className="bg-gray-800 rounded p-2 mb-2">
+                <p className="ml-2">✓ Passed AI resume screening</p>
+                <p className="ml-2">✓ Completed assessment test</p>
+                <p className="ml-2">✓ Test score ≥ 70%</p>
+              </div>
+              <p className="text-gray-300 text-xs italic">These candidates are qualified and ready to schedule interviews.</p>
             </div>
           </div>
           
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Tests Completed</h3>
-            <p className="text-3xl font-bold text-purple-600">{completedTests}</p>
-            <p className="text-sm text-gray-600">{totalCandidates > 0 ? Math.round((completedTests/totalCandidates)*100) : 0}% completion</p>
+          {/* High Performers */}
+          <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow group relative">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-600">High Performers</h3>
+              <span className="text-2xl">⭐</span>
+            </div>
+            <p className="text-4xl font-bold text-purple-600 mb-1">{highPerformers}</p>
+            <p className="text-xs text-gray-500">
+              {interviewReady > 0 
+                ? `${Math.round((highPerformers/interviewReady)*100)}% of interview-ready candidates`
+                : 'Test score ≥ 80%'
+              }
+            </p>
+            
+            {/* Tooltip */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-3 px-4 w-72 z-50 shadow-2xl border border-gray-700">
+              <p className="font-semibold mb-2 text-sm">⭐ High Performers</p>
+              <p className="mb-2">Exceptional candidates who scored ≥ 80% on the assessment test.</p>
+              <div className="bg-gray-800 rounded p-2 mb-2">
+                <p className="text-gray-300">• <strong>Top talent</strong> - Demonstrated strong skills</p>
+                <p className="text-gray-300">• Priority candidates for interviews</p>
+                <p className="text-gray-300">• Likely to excel in the role</p>
+              </div>
+              <p className="text-gray-300 text-xs italic">Consider fast-tracking these candidates through your hiring process.</p>
+            </div>
           </div>
           
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Avg AI Score</h3>
-            <p className="text-3xl font-bold text-orange-600">{avgAIScore}%</p>
-            <p className="text-sm text-gray-600">Compatibility rating</p>
+          {/* Awaiting Tests */}
+          <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow group relative">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-600">Awaiting Tests</h3>
+              <span className="text-2xl">⏳</span>
+            </div>
+            <p className="text-4xl font-bold text-orange-600 mb-1">{awaitingTests}</p>
+            <p className="text-xs text-gray-500">
+              {awaitingTests > 0 
+                ? 'Eligible but not tested yet'
+                : 'All eligible candidates tested'
+              }
+            </p>
+            
+            {/* Tooltip */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-3 px-4 w-72 z-50 shadow-2xl border border-gray-700">
+              <p className="font-semibold mb-2 text-sm">⏳ Awaiting Tests</p>
+              <p className="mb-2">Candidates who passed AI screening but haven't taken the assessment yet.</p>
+              <div className="bg-gray-800 rounded p-2 mb-2">
+                <p className="text-gray-300">• <strong>Action needed:</strong> Send test reminders</p>
+                <p className="text-gray-300">• May need follow-up communication</p>
+                <p className="text-gray-300">• Potential qualified candidates</p>
+              </div>
+              <p className="text-gray-300 text-xs italic">Reach out to these candidates to complete their assessment.</p>
+            </div>
           </div>
         </div>
 
@@ -472,8 +559,8 @@ export default function JobCandidates() {
                         )}
                       </td>
                       <td className="py-4">
-                        <span className={`px-2 py-1 rounded text-sm font-medium ${getStatusColor(candidate.status)}`}>
-                          {getStatusText(candidate.status)}
+                        <span className={`px-2 py-1 rounded text-sm font-medium ${getStatusColor(candidate.status, candidate.test_score)}`}>
+                          {getStatusText(candidate.status, candidate.test_score)}
                         </span>
                       </td>
                       <td className="py-4 text-sm text-gray-600">

@@ -54,9 +54,6 @@ export default function Jobs() {
                   <div>
                     <h2 className="text-xl font-semibold text-gray-900">{job.title}</h2>
                     <p className="text-gray-600">Posted by {job.recruiter_name}</p>
-                    <p className="text-sm text-gray-500">
-                      Posted on {new Date(job.created_at).toLocaleDateString()}
-                    </p>
                   </div>
                   <div className="text-right">
                     <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
