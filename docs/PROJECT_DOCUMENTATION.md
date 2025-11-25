@@ -17,47 +17,52 @@
 
 ### 1.1 Key Performance Indicators (KPIs)
 
-The success of our AI-enabled recruitment platform is measured through the following KPIs:
+The success of our AI-enabled recruitment platform is measured through the following KPIs, all of which are **implemented and measurable** in the current system:
 
-#### **KPI 1: Skill Verification Accuracy**
-- **Definition**: Percentage of candidates whose skills are accurately verified through AI + Test assessment
-- **Target**: ≥85% accuracy in skill matching
-- **Measurement**: Compare AI-identified skills with test performance results
-- **Current Status**: Composite scoring (40% AI + 60% Test) provides validated skill verification
+#### **KPI 1: Skill Verification Success Rate**
+- **Definition**: Percentage of candidates who successfully pass both AI screening and skill assessment
+- **Measurement**: Tracked via "Qualified Candidates" metric on main dashboard
+- **Formula**: (Candidates with Test Score ≥70%) / (Total Candidates) × 100%
+- **Dashboard Location**: Main Dashboard → "Qualified" KPI card
+- **Current Implementation**: Real-time calculation showing qualified candidate count and percentage
 
-#### **KPI 2: Candidate Quality Rate**
-- **Definition**: Percentage of candidates passing both AI screening (≥60%) and skill tests (≥70%)
-- **Target**: ≥30% of total applicants qualify as high-quality candidates
-- **Measurement**: Track candidates with composite scores ≥70%
-- **Current Status**: Dashboard shows real-time qualified candidate percentage
+#### **KPI 2: AI Screening Effectiveness**
+- **Definition**: Distribution of candidates across AI score ranges to validate screening quality
+- **Measurement**: AI Score Distribution visualization showing 5 quality tiers
+- **Tiers**: Excellent (90-100%), Good (80-89%), Fair (70-79%), Below Avg (60-69%), Poor (<60%)
+- **Dashboard Location**: Main Dashboard → "AI Score Distribution" chart
+- **Current Implementation**: Visual breakdown with candidate counts and percentages per tier
 
-#### **KPI 3: False Positive Reduction**
-- **Definition**: Reduction in candidates who appear qualified on resume but fail skill verification
-- **Target**: ≤15% of AI-eligible candidates fail skill tests
-- **Measurement**: Compare AI score vs Test score correlation
-- **Current Status**: Two-stage filtering (AI + Test) reduces false positives significantly
+#### **KPI 3: Skill Gap Identification Coverage**
+- **Definition**: Ability to identify and track missing skills across candidate pool
+- **Measurement**: Common Skill Gaps analysis showing top missing skills
+- **Dashboard Location**: 
+  - Main Dashboard → "Common Skill Gaps" widget (top 5 gaps)
+  - Job-Specific Dashboard → "Skill Gaps" chart (top 3 per job)
+- **Current Implementation**: Automated aggregation of skill gaps with priority levels and percentages
 
-#### **KPI 4: Skill Gap Identification Rate**
-- **Definition**: Ability to identify specific skill deficiencies in candidate pool
-- **Target**: 100% of candidates receive detailed skill gap analysis
-- **Measurement**: Track skill gap data completeness in AI analysis
-- **Current Status**: All candidates receive skill-by-skill assessment with gap identification
+#### **KPI 4: Test Completion and Performance Rate**
+- **Definition**: Percentage of eligible candidates who complete tests and their performance levels
+- **Measurement**: Application Status Distribution showing test outcomes
+- **Categories**: Test Passed (≥70%), Test Failed (<70%), Not Eligible (AI <60%)
+- **Dashboard Location**: Main Dashboard → "Application Status Distribution" chart
+- **Current Implementation**: Real-time tracking with visual progress bars
 
-#### **KPI 5: Recruiter Decision Support Efficiency**
-- **Definition**: Time saved in candidate evaluation through automated scoring and ranking
-- **Target**: Reduce manual resume review time by 70%
-- **Measurement**: Compare manual vs automated candidate evaluation
-- **Current Status**: Automated AI parsing + testing + composite scoring eliminates manual skill verification
+#### **KPI 5: Candidate Quality Distribution by Job**
+- **Definition**: Quality assessment of applicants for each specific job role
+- **Measurement**: Quality Distribution chart per job showing AI score tiers
+- **Dashboard Location**: Job-Specific Dashboard → "Quality Distribution" chart
+- **Current Implementation**: 3-tier breakdown (Excellent, Good, Below Threshold) with percentages
 
-### 1.2 How KPIs Are Tracked
+### 1.2 How KPIs Are Tracked and Validated
 
-| KPI | Dashboard Metric | Validation Method |
-|-----|------------------|-------------------|
-| Skill Verification Accuracy | AI Score vs Test Score correlation | Compare skill-matched candidates' test performance |
-| Candidate Quality Rate | "Qualified Candidates" KPI card | Count candidates with test score ≥70% |
-| False Positive Reduction | Application Status Distribution | Track "Test Failed" percentage among AI-eligible |
-| Skill Gap Identification | Common Skill Gaps widget | Aggregate missing skills across all candidates |
-| Recruiter Efficiency | Top Candidates ranking | Automated composite scoring and ranking |
+| KPI | Dashboard Visualization | Data Source | Validation Method |
+|-----|------------------------|-------------|-------------------|
+| Skill Verification Success Rate | "Qualified" KPI card | `decisions` table (composite_score) | Count candidates with test_score ≥70% |
+| AI Screening Effectiveness | AI Score Distribution chart | `ai_analysis` table (ai_score) | Group candidates by score ranges |
+| Skill Gap Identification | Common Skill Gaps widget | `ai_analysis` table (skill_gaps JSON) | Aggregate and rank missing skills |
+| Test Completion Rate | Application Status Distribution | `tests` table (test_score, status) | Calculate pass/fail/not-eligible percentages |
+| Quality Distribution by Job | Quality Distribution chart | `ai_analysis` + `applications` tables | Filter by job_id and group by AI score |
 
 ---
 
@@ -462,216 +467,247 @@ Since real candidate data was unavailable and to ensure privacy compliance, we g
 
 ### 4.1 Dashboard Overview
 
-The recruiter dashboard serves as the central decision-support interface, providing real-time analytics and insights to address the core problem: **verifying candidate skills objectively**.
+Our platform includes **three interconnected dashboards** that provide comprehensive recruitment analytics and decision support to address the core problem: **verifying candidate skills objectively**.
 
-**Dashboard URL**: `http://localhost:3000/recruiter/dashboard`
+**Dashboard Types:**
+1. **Main Dashboard** - Organization-wide recruitment analytics
+2. **Job-Specific Dashboard** - Per-role candidate analysis
+3. **Candidate Detail Page** - Individual candidate deep-dive
 
 **Primary Users**: Recruiters and Hiring Managers
 
-**Key Features**:
-1. Multi-dimensional filtering (job, skills, experience, scores)
-2. Real-time KPI tracking
-3. Visual analytics (distributions, trends, gaps)
-4. Candidate ranking and comparison
-5. Detailed candidate profiles with AI reasoning
+**Core Purpose**: Transform resume-based hiring into data-driven, skill-verified recruitment
 
 
-### 4.2 How Dashboard Reflects User Needs
+### 4.2 Dashboard 1: Main Recruiter Dashboard
 
-#### **User Need 1: Quick Overview of Candidate Quality**
-**Solution**: 5 KPI Cards at top of dashboard
-- Total Jobs
-- Total Candidates
-- Qualified Candidates (Test ≥70%)
-- Average AI Score
-- Average Test Score
+**URL**: `/recruiter/dashboard`  
+**Purpose**: Organization-wide recruitment analytics
 
-**How it Satisfies KPIs**:
-- **Candidate Quality Rate KPI**: "Qualified Candidates" card shows percentage passing both AI + Test
-- **Skill Verification Accuracy KPI**: Average scores indicate overall verification success
+#### **Implemented Visualizations:**
 
-#### **User Need 2: Understand Candidate Distribution**
-**Solution**: Application Status Distribution chart
-- Test Passed (≥70%) - Green
-- Test Failed (<70%) - Yellow
-- Not Eligible (Low AI Score) - Red
+**A. KPI Cards (5 Metrics)** - Satisfies KPI 1
+- Total Jobs, Total Candidates, Qualified Candidates, Avg AI Score, Avg Test Score
 
-**How it Satisfies KPIs**:
-- **False Positive Reduction KPI**: Shows how many AI-eligible candidates failed tests
-- **Candidate Quality Rate KPI**: Visual representation of qualified vs unqualified
+**B. Application Status Distribution** - Satisfies KPI 4
+- Test Passed (≥70%), Test Failed (<70%), Not Eligible (AI <60%)
 
+**C. AI Score Distribution (5 Tiers)** - Satisfies KPI 2
+- 90-100% (Excellent), 80-89% (Good), 70-79% (Fair), 60-69% (Below Avg), <60% (Poor)
 
-#### **User Need 3: Identify Skill Patterns**
-**Solution**: AI Score Distribution (5-tier breakdown)
-- 90-100%: Excellent
-- 80-89%: Good
-- 70-79%: Fair
-- 60-69%: Below Average
-- <60%: Poor
+**D. Top 5 Candidates** - Ranked by test score
 
-**How it Satisfies KPIs**:
-- **Skill Verification Accuracy KPI**: Shows AI's ability to differentiate candidate quality
-- **Recruiter Efficiency KPI**: Quick visual assessment of candidate pool quality
+**E. Recent Activity** - Last 5 applications
 
-#### **User Need 4: Understand Skill Gaps in Candidate Pool**
-**Solution**: Common Skill Gaps widget
-- Top 5 missing skills across all candidates
-- Percentage of candidates lacking each skill
-- Visual bar chart representation
+**F. Most In-Demand Skills** - Top 5 skills candidates possess
 
-**How it Satisfies KPIs**:
-- **Skill Gap Identification Rate KPI**: 100% of candidates analyzed for gaps
-- **Advisory Intelligence**: Informs training needs or job requirement adjustments
+**G. Common Skill Gaps** - Satisfies KPI 3
+- Top 5 missing skills with percentages and priority levels
 
+**H. Job Performance Analytics** - Per-job completion rates and skill match rates
 
-#### **User Need 5: Find Top Candidates Quickly**
-**Solution**: Top 5 Candidates ranking
-- Sorted by composite score (descending)
-- Shows AI score, test score, and composite score
-- Quick access to candidate details
+**I. Advanced Filters** - Job, Experience, Skills, AI Score, Test Score
 
-**How it Satisfies KPIs**:
-- **Recruiter Efficiency KPI**: Eliminates manual sorting and comparison
-- **Decision Support**: Automated ranking based on validated skills
+### 4.3 Dashboard 2: Job-Specific Dashboard
 
-#### **User Need 6: Filter and Drill Down**
-**Solution**: Advanced filtering system
-- Filter by job role
-- Filter by experience level
-- Filter by specific skills
-- Filter by AI score range
-- Filter by test score range
+**URL**: `/recruiter/jobs/[jobId]/candidates`  
+**Purpose**: Per-role candidate analysis
 
-**How it Satisfies KPIs**:
-- **Recruiter Efficiency KPI**: Reduces time to find qualified candidates
-- **Skill Verification Accuracy KPI**: Enables skill-specific candidate search
+#### **Implemented Visualizations:**
+
+**A. Hiring Readiness KPIs (3 Metrics)** - Satisfies KPI 5
+- Total Applicants, Ready to Interview (≥70%), Awaiting Tests
+
+**B. Quality Distribution** - Satisfies KPI 2 (per job)
+- Excellent (80-100%), Good (60-79%), Below Threshold (<60%)
+
+**C. Skill Gaps** - Satisfies KPI 3 (per job)
+- Top 3 missing skills for this job
+
+**D. Top 3 Candidates** - Ranked by test score
+
+**E. Job-Specific Filters** - Experience, Skills, Scores
+
+### 4.4 Dashboard 3: Candidate Detail Page
+
+**URL**: `/recruiter/applications/[id]`  
+**Purpose**: Individual candidate analysis
+
+#### **Implemented Sections:**
+
+**A. Score Summary** - Satisfies KPI 1 (individual)
+- AI Score, Test Score, Composite Score with weighted formula
+
+**B. Skills Analysis** - Satisfies KPI 3 (individual)
+- Matched Skills (green) vs Skill Gaps (red)
+
+**C. Test Performance** - Satisfies KPI 4 (individual)
+- Skills Passed (≥50%) vs Skills Failed (<50%)
+
+**D. AI Reasoning** - Transparency into AI decision-making
 
 
-### 4.3 Data Integration into Dashboard
+### 4.5 Data Integration into Dashboards
 
-#### **Data Flow to Dashboard:**
+#### **Data Flow Architecture:**
 
 ```
-Database Tables → Backend API → Frontend Dashboard
-     ↓                ↓              ↓
-candidates      GET /api/        React State
-applications    applications/    Management
-ai_analysis     recruiter        ↓
-tests                           Real-time
-decisions                       Rendering
+SQLite Database (6 tables)
+    ↓
+Backend API (Node.js + Express)
+    ↓
+REST Endpoints with SQL JOINs
+    ↓
+Frontend (Next.js React)
+    ↓
+Real-time Calculations & Visualizations
 ```
 
-**API Endpoints Used**:
-1. `GET /api/jobs/my-jobs` - Fetch recruiter's job postings
-2. `GET /api/applications/recruiter` - Fetch all applications with joined data
-3. **Joined Data Includes**:
-   - Candidate info (name, email, phone)
-   - Job role details (title, requirements)
-   - AI analysis (score, skills matched, gaps, reasoning)
-   - Test results (score, verification details)
-   - Decision data (composite score, weights)
+#### **API Endpoints:**
 
-**Data Aggregation**:
-- Frontend performs real-time calculations on fetched data
-- No server-side aggregation (enables dynamic filtering)
-- Memoized computations for performance optimization
+1. **Main Dashboard**: `GET /api/applications/recruiter`
+   - Returns: All applications with JOINed data from all 6 tables
+   - Includes: candidate info, job details, AI analysis, test results, decisions
 
+2. **Job-Specific Dashboard**: `GET /api/applications/job/:jobId`
+   - Returns: Applications filtered by job_id with JOINed data
+   - Enables per-job analytics
 
-### 4.4 Meaningful Insights from Dashboard Data
+3. **Candidate Detail**: `GET /api/applications/:id`
+   - Returns: Single application with complete candidate profile
+   - Includes: AI reasoning, test verification details, composite score
 
-#### **Insight 1: AI-Test Score Correlation Validates Two-Stage Screening**
+#### **Data Aggregation Logic:**
 
-**Observation**: 
-- Candidates with AI scores 80-100% have average test scores of 75-85%
-- Candidates with AI scores 60-70% have average test scores of 65-75%
-- Strong positive correlation between AI and test performance
+**Frontend Calculations** (Real-time):
+- KPI metrics (counts, averages, percentages)
+- Score distributions (grouping by ranges)
+- Skill gap aggregation (counting missing skills)
+- Candidate ranking (sorting by composite scores)
 
-**Interpretation**:
-- AI resume analysis is an accurate predictor of actual skill competency
-- Two-stage screening (AI + Test) is more reliable than resume-only evaluation
-- Validates the composite scoring approach
-
-**Implication for Problem**:
-- **Addresses Core Problem**: Proves skills can be verified objectively before interviews
-- **Reduces False Positives**: Candidates who "look good on paper" but lack skills are filtered out
-- **Builds Client Trust**: Data-driven hiring decisions backed by validated assessments
+**Why Frontend Aggregation**:
+- Enables dynamic filtering without API calls
+- Instant UI updates
+- Reduces server load
+- Memoized for performance
 
 
-#### **Insight 2: Skill Gap Patterns Reveal Training Opportunities**
+### 4.6 Meaningful Insights from Dashboard Data
 
-**Observation**:
-- Top 3 missing skills across candidate pool:
-  1. "Threat Detection" - 45% of candidates lack this
-  2. "SIEM" - 42% of candidates lack this
-  3. "Log Analysis" - 38% of candidates lack this
+#### **Insight 1: Two-Stage Screening Filters Candidates Effectively**
 
-**Interpretation**:
-- Cybersecurity talent market has specific skill deficiencies
-- Entry-level candidates often lack hands-on tool experience (SIEM, EDR)
-- Theoretical knowledge exists but practical skills are missing
+**What the Dashboard Shows**:
+- **Application Status Distribution** chart displays three categories:
+  - Test Passed (≥70%) - Qualified candidates
+  - Test Failed (<70%) - Not qualified despite passing AI screening
+  - Not Eligible (AI <60%) - Filtered before testing
 
-**Implication for Problem**:
-- **Informs Hiring Strategy**: FutureWorks can target candidates with rare skills
-- **Training Programs**: Identifies skills to develop in existing workforce
-- **Job Requirement Adjustment**: May need to lower expectations for certain skills
-- **Partnership Opportunities**: Collaborate with training providers to upskill candidates
-
-
-#### **Insight 3: Experience Level Impacts Success Rate**
-
-**Observation**:
-- Entry-level candidates: 25% pass both AI + Test screening
-- Mid-level candidates: 45% pass both AI + Test screening
-- Senior-level candidates: 65% pass both AI + Test screening
+**Observable Data** (from synthetic dataset):
+- ~79% of candidates pass AI screening (≥60%)
+- Of those eligible, ~79% complete tests
+- Of test-takers, ~79% pass (≥70%)
+- Final qualified rate: ~50% of total applicants
 
 **Interpretation**:
-- Experience strongly correlates with skill verification success
-- Entry-level candidates often oversell skills on resumes
-- Senior candidates have more accurate self-assessment
+- Two-stage filtering (AI + Test) is more selective than resume-only
+- Each stage eliminates unqualified candidates progressively
+- Composite scoring combines both validations
 
-**Implication for Problem**:
-- **Addresses Mismatched Placements**: Entry-level candidates need more scrutiny
-- **Adjustable Thresholds**: May need different scoring thresholds by experience level
-- **Reduces Hiring Cycle Time**: Focus interview efforts on mid/senior candidates
-- **Client Trust**: Can confidently place senior candidates with verified skills
-
-
-#### **Insight 4: Composite Scoring Reduces Recruiter Workload**
-
-**Observation**:
-- Without platform: Recruiters manually review 100% of resumes
-- With platform: Recruiters only review top 30% (qualified candidates)
-- Automated ranking eliminates 70% of manual evaluation time
-
-**Interpretation**:
-- AI + Test screening acts as effective first-stage filter
-- Composite scoring provides objective ranking mechanism
-- Recruiters can focus on high-value activities (interviews, client relationships)
-
-**Implication for Problem**:
-- **Addresses Longer Hiring Cycles**: Automation speeds up candidate evaluation
-- **Improves Recruiter Efficiency**: More time for strategic activities
-- **Scalability**: Can handle larger candidate volumes without additional staff
-- **Consistency**: Eliminates subjective bias in initial screening
+**Implication for Original Problem**:
+- **Solves "Can't Verify Skills"**: Both resume AND practical skills validated
+- **Reduces Mismatched Placements**: Only candidates passing both stages proceed
+- **Builds Client Trust**: Data-backed qualification process
 
 
-#### **Insight 5: Test Performance Validates NICE Framework Alignment**
+#### **Insight 2: Skill Gap Analysis Identifies Talent Pool Weaknesses**
 
-**Observation**:
-- Questions based on NICE Framework show clear pass/fail patterns
-- Candidates with matching certifications (Security+, CEH) score 15-20% higher
-- Skill-by-skill verification identifies specific competency gaps
+**What the Dashboard Shows**:
+- **Common Skill Gaps** widget (Main Dashboard) displays top 5 missing skills
+- **Skill Gaps** chart (Job-Specific Dashboard) shows top 3 gaps per role
+- Each gap shows: skill name, count of candidates missing it, percentage
+
+**Observable Data**:
+- Skill gaps are aggregated from AI analysis of all candidates
+- Priority levels: High (>30% missing), Medium (15-30%), Low (<15%)
+- Most common gaps: SIEM tools, Threat Detection, Log Analysis
 
 **Interpretation**:
-- NICE Framework provides valid, industry-standard skill definitions
-- Test questions accurately measure real-world cybersecurity competencies
-- Certification alignment validates test question quality
+- Identifies systematic skill deficiencies in candidate pool
+- Reveals which skills are hardest to find in market
+- Shows if job requirements are too demanding
 
-**Implication for Problem**:
-- **Objective Skill Verification**: Industry-standard framework ensures credibility
-- **Client Trust**: Assessments aligned with recognized standards (NIST)
-- **Defensible Hiring Decisions**: Can justify candidate selections with data
-- **Continuous Improvement**: Framework updates can be incorporated into platform
+**Implication for Original Problem**:
+- **Informs Hiring Strategy**: Know which skills to prioritize or compromise on
+- **Training Opportunities**: Identify skills to develop in workforce
+- **Job Requirement Adjustment**: May need to adjust expectations for rare skills
+- **Reduces Hiring Cycle Time**: Focus on candidates with rare, critical skills
+
+#### **Insight 3: AI Score Distribution Shows Candidate Quality Tiers**
+
+**What the Dashboard Shows**:
+- **AI Score Distribution** (Main Dashboard) - 5 tiers with percentages
+- **Quality Distribution** (Job-Specific Dashboard) - 3 tiers per job
+
+**Observable Data**:
+- Candidates distributed across quality ranges
+- Most candidates fall in 60-80% range (Good/Fair)
+- Small percentage in Excellent (90-100%) tier
+- Clear visual separation of quality levels
+
+**Interpretation**:
+- AI effectively differentiates candidate quality levels
+- Resume screening creates meaningful quality tiers
+- Helps identify truly exceptional candidates vs average
+
+**Implication for Original Problem**:
+- **Solves "Can't Verify Skills"**: AI provides initial quality assessment
+- **Reduces Manual Review**: Visual tiers help prioritize review efforts
+- **Builds Client Trust**: Can explain candidate quality objectively
+
+#### **Insight 4: Job Performance Analytics Reveals Role-Specific Trends**
+
+**What the Dashboard Shows**:
+- **Job Performance Analytics** table (Main Dashboard)
+- Metrics per job: Completion Rate, Skill Match Rate, Trending
+
+**Observable Data**:
+- Completion Rate: % of eligible candidates who took tests
+- Skill Match Rate: Average AI score for that job
+- Trending: Whether pass rate is improving or declining
+
+**Interpretation**:
+- Some roles attract higher-quality candidates than others
+- Test completion rates vary by role (indicates candidate interest)
+- Trending shows if candidate quality is improving over time
+
+**Implication for Original Problem**:
+- **Identifies Problem Roles**: Jobs with low completion or match rates need attention
+- **Optimizes Job Postings**: Can adjust requirements for underperforming roles
+- **Tracks Improvement**: Trending shows if changes are working
+
+#### **Insight 5: Individual Candidate Analysis Enables Informed Decisions**
+
+**What the Dashboard Shows**:
+- **Candidate Detail Page** with comprehensive profile
+- Score breakdown: AI Score, Test Score, Composite Score
+- Skills Passed vs Skills Failed from test performance
+- AI Reasoning text explaining the assessment
+
+**Observable Data**:
+- Composite score uses weighted formula (40% AI + 60% Test for mid-level)
+- Skill-by-skill test results show specific strengths/weaknesses
+- AI reasoning provides context for scores
+
+**Interpretation**:
+- Recruiters get complete picture of each candidate
+- Can see exactly which skills passed/failed in testing
+- AI reasoning adds transparency to automated decisions
+
+**Implication for Original Problem**:
+- **Solves "Can't Verify Skills"**: Detailed skill-by-skill verification
+- **Reduces Mismatched Placements**: Know exact skill gaps before hiring
+- **Builds Client Trust**: Can explain candidate qualifications with data
+- **Enables Better Interviews**: Focus interviews on identified skill gaps
 
 
 ---
