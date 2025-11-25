@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../../../components/Layout';
 import Link from 'next/link';
 import { useAuth } from '../../../../context/AuthContext';
 import { jobsAPI, applicationsAPI } from '../../../../utils/api';
+import JobCandidateFilters from '../../../../components/JobCandidateFilters';
+import { applyJobFilters, getDefaultJobFilters } from '../../../../utils/filterHelpers';
 
 export default function JobCandidates() {
   const { isRecruiter } = useAuth();
@@ -16,6 +18,7 @@ export default function JobCandidates() {
   const [error, setError] = useState('');
   const [expandedCandidate, setExpandedCandidate] = useState(null);
   const [sortBy, setSortBy] = useState('date'); // 'ai_score', 'test_score', 'date'
+  const [filters, setFilters] = useState(getDefaultJobFilters());
 
   useEffect(() => {
     if (jobId && isRecruiter) {
@@ -36,6 +39,95 @@ export default function JobCandidates() {
       setError('Failed to load job candidates');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Apply filters first, then sort (must be before early returns)
+  const filteredCandidates = useMemo(() => {
+    return applyJobFilters(candidates, filters);
+  }, [candidates, filters]);
+
+  // Sort filtered candidates based on selected option
+  const sortedCandidates = useMemo(() => {
+    return [...filteredCandidates].sort((a, b) => {
+      switch (sortBy) {
+        case 'ai_score':
+          return (b.ai_score || 0) - (a.ai_score || 0);
+        case 'test_score':
+          return (b.test_score || 0) - (a.test_score || 0);
+        case 'date':
+        default:
+          return new Date(b.created_at) - new Date(a.created_at);
+      }
+    });
+  }, [filteredCandidates, sortBy]);
+
+  // Calculate statistics - Hiring Readiness Metrics (using filtered candidates)
+  const totalCandidates = filteredCandidates.length;
+  const totalAllCandidates = candidates.length;
+  
+  const interviewReady = filteredCandidates.filter(c => 
+    c.status === 'test_completed' && c.test_score >= 70
+  ).length;
+  
+  const highPerformers = filteredCandidates.filter(c => 
+    c.status === 'test_completed' && c.test_score >= 80
+  ).length;
+  
+  const awaitingTests = filteredCandidates.filter(c => {
+    const hasTestScore = c.test_score !== null && c.test_score !== undefined && c.test_score !== '' && c.test_score !== 0;
+    return c.status === 'eligible' || (c.status === 'test_completed' && !hasTestScore);
+  }).length;
+
+  const jobRoleData = job ? {
+    skills: job.skills || [],
+    certifications: job.certifications || []
+  } : null;
+
+  // Helper functions
+  const getStatusColor = (status, testScore) => {
+    const hasTestScore = testScore !== null && testScore !== undefined && testScore !== '' && testScore !== 0;
+    
+    if (status === 'test_completed' && hasTestScore) {
+      return 'bg-blue-100 text-blue-800';
+    }
+    if (status === 'test_completed' && !hasTestScore) {
+      return 'bg-green-100 text-green-800';
+    }
+    
+    switch (status) {
+      case 'eligible': return 'bg-green-100 text-green-800';
+      case 'not_eligible': return 'bg-red-100 text-red-800';
+      case 'hired': return 'bg-purple-100 text-purple-800';
+      case 'rejected': return 'bg-gray-100 text-gray-800';
+      case 'under_review': return 'bg-yellow-100 text-yellow-800';
+      case 'shortlisted': return 'bg-indigo-100 text-indigo-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusText = (status, testScore) => {
+    const hasTestScore = testScore !== null && testScore !== undefined && testScore !== '' && testScore !== 0;
+    
+    if (status === 'test_completed' && hasTestScore) {
+      return 'Test Completed';
+    }
+    if (status === 'test_completed' && !hasTestScore) {
+      return 'Eligible for Test';
+    }
+    
+    switch (status) {
+      case 'eligible': return 'Eligible for Test';
+      case 'not_eligible': return 'Not Eligible';
+      case 'test_completed': return 'Test Completed';
+      case 'hired': return 'Hired';
+      case 'rejected': return 'Rejected';
+      case 'under_review': return 'Under Review';
+      case 'shortlisted': return 'Shortlisted';
+      case 'test_assigned': return 'Test Assigned';
+      case 'test_in_progress': return 'Taking Test';
+      case 'interviewed': return 'Interviewed';
+      default: return 'Pending';
     }
   };
 
@@ -65,86 +157,7 @@ export default function JobCandidates() {
     );
   }
 
-  const getStatusColor = (status, testScore) => {
-    // Check if test score actually exists (not null, undefined, 0, or empty string)
-    const hasTestScore = testScore !== null && testScore !== undefined && testScore !== '' && testScore !== 0;
-    
-    if (status === 'test_completed' && hasTestScore) {
-      return 'bg-blue-100 text-blue-800'; // Actually completed test
-    }
-    if (status === 'test_completed' && !hasTestScore) {
-      return 'bg-green-100 text-green-800'; // Eligible but not taken test yet
-    }
-    
-    switch (status) {
-      case 'eligible': return 'bg-green-100 text-green-800';
-      case 'not_eligible': return 'bg-red-100 text-red-800';
-      case 'hired': return 'bg-purple-100 text-purple-800';
-      case 'rejected': return 'bg-gray-100 text-gray-800';
-      case 'under_review': return 'bg-yellow-100 text-yellow-800';
-      case 'shortlisted': return 'bg-indigo-100 text-indigo-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
 
-  const getStatusText = (status, testScore) => {
-    // Check if test score actually exists
-    const hasTestScore = testScore !== null && testScore !== undefined && testScore !== '' && testScore !== 0;
-    
-    if (status === 'test_completed' && hasTestScore) {
-      return 'Test Completed';
-    }
-    if (status === 'test_completed' && !hasTestScore) {
-      return 'Eligible for Test';
-    }
-    
-    switch (status) {
-      case 'eligible': return 'Eligible for Test';
-      case 'not_eligible': return 'Not Eligible';
-      case 'test_completed': return 'Test Completed';
-      case 'hired': return 'Hired';
-      case 'rejected': return 'Rejected';
-      case 'under_review': return 'Under Review';
-      case 'shortlisted': return 'Shortlisted';
-      case 'test_assigned': return 'Test Assigned';
-      case 'test_in_progress': return 'Taking Test';
-      case 'interviewed': return 'Interviewed';
-      default: return 'Pending';
-    }
-  };
-
-  // Sort candidates based on selected option
-  const sortedCandidates = [...candidates].sort((a, b) => {
-    switch (sortBy) {
-      case 'ai_score':
-        return (b.ai_score || 0) - (a.ai_score || 0);
-      case 'test_score':
-        return (b.test_score || 0) - (a.test_score || 0);
-      case 'date':
-      default:
-        return new Date(b.created_at) - new Date(a.created_at);
-    }
-  });
-
-  // Calculate statistics - Hiring Readiness Metrics
-  const totalCandidates = candidates.length;
-  
-  // Interview Ready: Passed screening AND test (score ≥70%)
-  const interviewReady = candidates.filter(c => 
-    c.status === 'test_completed' && c.test_score >= 70
-  ).length;
-  
-  // High Performers: Test score ≥ 80% (exceptional candidates)
-  const highPerformers = candidates.filter(c => 
-    c.status === 'test_completed' && c.test_score >= 80
-  ).length;
-  
-  // Awaiting Tests: Candidates showing "Eligible for Test" status
-  // This matches the same logic as getStatusText() function
-  const awaitingTests = candidates.filter(c => {
-    const hasTestScore = c.test_score !== null && c.test_score !== undefined && c.test_score !== '' && c.test_score !== 0;
-    return c.status === 'eligible' || (c.status === 'test_completed' && !hasTestScore);
-  }).length;
 
   return (
     <Layout>
@@ -180,16 +193,41 @@ export default function JobCandidates() {
             <h1 className="text-3xl font-bold text-gray-900 mb-4">{job?.title}</h1>
             
             <div className="mb-4">
+              <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                AI Score Threshold: {job?.threshold_score}%
+              </span>
+            </div>
+            
+            <div className="mb-4">
               <h3 className="text-lg font-semibold text-gray-700 mb-2">Job Description</h3>
               <p className="text-gray-600 leading-relaxed">{job?.description}</p>
             </div>
             
-            {job?.requirements && (
+            {job?.mainResponsibilities && job.mainResponsibilities.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">Requirements</h3>
-                <p className="text-gray-600 leading-relaxed">{job?.requirements}</p>
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">Main Responsibilities</h3>
+                <ul className="list-disc list-inside space-y-2 text-gray-600">
+                  {job.mainResponsibilities.map((responsibility, index) => (
+                    <li key={index} className="leading-relaxed">{responsibility}</li>
+                  ))}
+                </ul>
               </div>
             )}
+            
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">Preferred Qualifications</h3>
+              <ul className="list-disc list-inside space-y-2 text-gray-600">
+                {job?.education && <li className="leading-relaxed">{job.education}</li>}
+                {job?.preferredExperience && job.preferredExperience.map((exp, index) => (
+                  <li key={index} className="leading-relaxed">{exp}</li>
+                ))}
+                {job?.certifications && job.certifications.length > 0 && (
+                  <li className="leading-relaxed">
+                    Certifications: {job.certifications.join(', ')}
+                  </li>
+                )}
+              </ul>
+            </div>
             
             <div className="flex items-center space-x-4 text-sm text-gray-500 pt-4 border-t">
               <span>💰 ${job?.salary_min?.toLocaleString()} - ${job?.salary_max?.toLocaleString()}</span>
@@ -202,13 +240,35 @@ export default function JobCandidates() {
           </div>
         </div>
 
-        {/* Hiring Readiness Metrics */}
+        {/* Job Candidate Filters */}
+        <JobCandidateFilters 
+          jobId={jobId}
+          jobRole={jobRoleData}
+          candidates={candidates}
+          onFilterChange={setFilters}
+        />
+
+        {/* Results Counter */}
+        {totalCandidates !== totalAllCandidates && (
+          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              Showing <span className="font-semibold">{totalCandidates}</span> of <span className="font-semibold">{totalAllCandidates}</span> candidates
+              {totalCandidates === 0 && (
+                <span className="ml-2 text-blue-600">
+                  - No candidates match your filters. Try adjusting your criteria.
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+
+        {/* Hiring Readiness Metrics - Streamlined */}
         <div className="mb-4">
           <h2 className="text-xl font-semibold text-gray-800">🎯 Hiring Readiness</h2>
-          <p className="text-sm text-gray-600">Understand your candidate pool quality and readiness</p>
+          <p className="text-sm text-gray-600">Key metrics for this position</p>
         </div>
         
-        <div className="grid md:grid-cols-4 gap-6 mb-6">
+        <div className="grid md:grid-cols-3 gap-6 mb-6">
           {/* Total Applicants */}
           <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between mb-2">
@@ -219,54 +279,33 @@ export default function JobCandidates() {
             <p className="text-xs text-gray-500">Applied for this position</p>
           </div>
           
-          {/* Interview Ready */}
+          {/* Ready to Interview (merged Interview Ready + High Performers) */}
           <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow group relative">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-gray-600">Interview Ready</h3>
+              <h3 className="text-sm font-semibold text-gray-600">Ready to Interview</h3>
               <span className="text-2xl">✅</span>
             </div>
             <p className="text-4xl font-bold text-green-600 mb-1">{interviewReady}</p>
             <p className="text-xs text-gray-500">
-              {totalCandidates > 0 ? Math.round((interviewReady/totalCandidates)*100) : 0}% qualified for next stage
+              {totalCandidates > 0 ? Math.round((interviewReady/totalCandidates)*100) : 0}% passed test (≥70%)
+              {highPerformers > 0 && (
+                <span className="text-purple-600 font-semibold ml-1">• {highPerformers} top performers (≥80%)</span>
+              )}
             </p>
             
             {/* Tooltip */}
             <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-3 px-4 w-72 z-50 shadow-2xl border border-gray-700">
-              <p className="font-semibold mb-2 text-sm">✅ Interview Ready</p>
+              <p className="font-semibold mb-2 text-sm">✅ Ready to Interview</p>
               <p className="mb-2">Candidates who passed both screening stages:</p>
               <div className="bg-gray-800 rounded p-2 mb-2">
                 <p className="ml-2">✓ Passed AI resume screening</p>
                 <p className="ml-2">✓ Completed assessment test</p>
                 <p className="ml-2">✓ Test score ≥ 70%</p>
               </div>
+              <p className="text-purple-300 text-xs mb-2">
+                <strong>Top Performers (≥80%):</strong> {highPerformers} candidates - Priority for interviews
+              </p>
               <p className="text-gray-300 text-xs italic">These candidates are qualified and ready to schedule interviews.</p>
-            </div>
-          </div>
-          
-          {/* High Performers */}
-          <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow group relative">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-gray-600">High Performers</h3>
-              <span className="text-2xl">⭐</span>
-            </div>
-            <p className="text-4xl font-bold text-purple-600 mb-1">{highPerformers}</p>
-            <p className="text-xs text-gray-500">
-              {interviewReady > 0 
-                ? `${Math.round((highPerformers/interviewReady)*100)}% of interview-ready candidates`
-                : 'Test score ≥ 80%'
-              }
-            </p>
-            
-            {/* Tooltip */}
-            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-3 px-4 w-72 z-50 shadow-2xl border border-gray-700">
-              <p className="font-semibold mb-2 text-sm">⭐ High Performers</p>
-              <p className="mb-2">Exceptional candidates who scored ≥ 80% on the assessment test.</p>
-              <div className="bg-gray-800 rounded p-2 mb-2">
-                <p className="text-gray-300">• <strong>Top talent</strong> - Demonstrated strong skills</p>
-                <p className="text-gray-300">• Priority candidates for interviews</p>
-                <p className="text-gray-300">• Likely to excel in the role</p>
-              </div>
-              <p className="text-gray-300 text-xs italic">Consider fast-tracking these candidates through your hiring process.</p>
             </div>
           </div>
           
@@ -298,165 +337,192 @@ export default function JobCandidates() {
           </div>
         </div>
 
-        {/* Job-Specific Insights */}
-        <div className="grid lg:grid-cols-3 gap-6 mb-6">
-          {/* Candidate Quality Distribution */}
+        {/* Analytics Grid - Quality Distribution, Skill Gaps, Top Candidates */}
+        <div className="grid md:grid-cols-3 gap-6 mb-6">
+          
+          {/* 1. Quality Distribution */}
           <div className="bg-white rounded-lg shadow-md p-6 group relative">
-            <div className="flex items-center gap-2 mb-4">
-              <h3 className="text-lg font-semibold cursor-help border-b border-dotted border-gray-400">📊 Quality Distribution</h3>
-            </div>
+            <h2 className="text-xl font-semibold mb-4">📊 Quality Distribution</h2>
+            <p className="text-xs text-gray-500 mb-3">All-time candidate quality (filters don't apply)</p>
             
             {/* Tooltip */}
-            <div className="absolute top-0 right-0 mt-2 mr-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-3 px-4 w-72 z-10 shadow-xl">
-              <p className="font-semibold mb-2">How Quality is Calculated:</p>
-              <p className="mb-2">Based on AI Resume Screening Score which evaluates:</p>
-              <ul className="list-disc list-inside space-y-1 mb-2">
-                <li>Skills match with job requirements</li>
-                <li>Experience level alignment</li>
-                <li>Education and certifications</li>
-                <li>Overall profile compatibility</li>
-              </ul>
-              <p className="text-xs text-gray-300 mt-2">
-                <strong>Excellent (80-100%):</strong> Strong match, highly recommended<br/>
-                <strong>Good (60-79%):</strong> Decent match, worth considering<br/>
-                <strong>Below Threshold (&lt;60%):</strong> Weak match, not recommended
-              </p>
+            <div className="absolute top-0 right-0 mt-2 mr-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-3 px-4 w-72 z-50 shadow-2xl border border-gray-700">
+              <p className="font-semibold mb-2 text-sm">📊 Quality Distribution</p>
+              <p className="mb-2">Shows AI resume screening scores for ALL candidates who applied to this position.</p>
+              <div className="bg-gray-800 rounded p-2 mb-2 space-y-1">
+                <p className="text-green-300">• <strong>Excellent (80-100%):</strong> Strong resume match</p>
+                <p className="text-blue-300">• <strong>Good (60-79%):</strong> Moderate resume match</p>
+                <p className="text-red-300">• <strong>Below Threshold (&lt;60%):</strong> Weak resume match</p>
+              </div>
+              <p className="text-gray-300 text-xs italic">Note: Shows all-time data, not affected by filters.</p>
             </div>
             
             <div className="space-y-3">
-              {(() => {
-                const excellent = candidates.filter(c => c.ai_score >= 80).length;
-                const good = candidates.filter(c => c.ai_score >= 60 && c.ai_score < 80).length;
-                const poor = candidates.filter(c => c.ai_score < 60).length;
-                const total = candidates.length || 1;
-                
-                return (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                        <span className="text-sm">Excellent (80-100%)</span>
-                      </div>
-                      <span className="font-semibold">{excellent} ({Math.round((excellent/total)*100)}%)</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-green-500 h-2 rounded-full" style={{ width: `${(excellent/total)*100}%` }}></div>
-                    </div>
-                    
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
-                        <span className="text-sm">Good (60-79%)</span>
-                      </div>
-                      <span className="font-semibold">{good} ({Math.round((good/total)*100)}%)</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${(good/total)*100}%` }}></div>
-                    </div>
-                    
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-                        <span className="text-sm">Below Threshold (&lt;60%)</span>
-                      </div>
-                      <span className="font-semibold">{poor} ({Math.round((poor/total)*100)}%)</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-red-500 h-2 rounded-full" style={{ width: `${(poor/total)*100}%` }}></div>
-                    </div>
-                  </>
-                );
-              })()}
+              {/* Excellent (80-100%) */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-sm font-medium text-gray-700">Excellent (80-100%)</span>
+                  <span className="text-sm font-semibold text-green-600">
+                    {candidates.filter(c => c.ai_score >= 80).length} ({candidates.length > 0 ? Math.round((candidates.filter(c => c.ai_score >= 80).length / candidates.length) * 100) : 0}%)
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-green-500 h-3 rounded-full transition-all duration-500"
+                    style={{ width: `${candidates.length > 0 ? (candidates.filter(c => c.ai_score >= 80).length / candidates.length) * 100 : 0}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Good (60-79%) */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-sm font-medium text-gray-700">Good (60-79%)</span>
+                  <span className="text-sm font-semibold text-blue-600">
+                    {candidates.filter(c => c.ai_score >= 60 && c.ai_score < 80).length} ({candidates.length > 0 ? Math.round((candidates.filter(c => c.ai_score >= 60 && c.ai_score < 80).length / candidates.length) * 100) : 0}%)
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-blue-500 h-3 rounded-full transition-all duration-500"
+                    style={{ width: `${candidates.length > 0 ? (candidates.filter(c => c.ai_score >= 60 && c.ai_score < 80).length / candidates.length) * 100 : 0}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Below Threshold (<60%) */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-sm font-medium text-gray-700">Below Threshold (&lt;60%)</span>
+                  <span className="text-sm font-semibold text-red-600">
+                    {candidates.filter(c => c.ai_score < 60).length} ({candidates.length > 0 ? Math.round((candidates.filter(c => c.ai_score < 60).length / candidates.length) * 100) : 0}%)
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-red-500 h-3 rounded-full transition-all duration-500"
+                    style={{ width: `${candidates.length > 0 ? (candidates.filter(c => c.ai_score < 60).length / candidates.length) * 100 : 0}%` }}
+                  ></div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Skill Match Analysis */}
+          {/* 2. Skill Match Analysis */}
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold mb-4">🎯 Skill Match Analysis</h3>
-            <div className="space-y-3">
-              {(() => {
-                // Analyze most common skill gaps
-                const gapCounts = {};
-                candidates.forEach(c => {
-                  if (c.skill_gaps) {
-                    try {
-                      const gaps = typeof c.skill_gaps === 'string' ? JSON.parse(c.skill_gaps) : c.skill_gaps;
-                      gaps.forEach(gap => {
-                        const gapName = typeof gap === 'string' ? gap : gap.skill || gap;
-                        gapCounts[gapName] = (gapCounts[gapName] || 0) + 1;
-                      });
-                    } catch (e) {}
+            <h2 className="text-xl font-semibold mb-4">🎯 Skill Gaps</h2>
+            <p className="text-xs text-gray-500 mb-3">Top 3 skills candidates lack (filters don't apply)</p>
+            {(() => {
+              // Extract skill gaps from ALL candidates (same logic as main dashboard)
+              const gapCounts = {};
+              candidates.forEach(candidate => {
+                if (candidate.skill_gaps) {
+                  try {
+                    const gaps = typeof candidate.skill_gaps === 'string' 
+                      ? JSON.parse(candidate.skill_gaps) 
+                      : candidate.skill_gaps;
+                    gaps.forEach(gap => {
+                      const gapName = typeof gap === 'string' ? gap : gap.skill || gap;
+                      gapCounts[gapName] = (gapCounts[gapName] || 0) + 1;
+                    });
+                  } catch (e) {
+                    // Skip invalid data
                   }
-                });
-                
-                const topGaps = Object.entries(gapCounts)
-                  .sort(([,a], [,b]) => b - a)
-                  .slice(0, 3);
-                
-                if (topGaps.length === 0) {
-                  return <p className="text-sm text-gray-500">No significant skill gaps detected</p>;
                 }
-                
-                return topGaps.map(([skill, count], idx) => (
-                  <div key={idx} className="flex justify-between items-center p-2 bg-orange-50 rounded">
-                    <span className="text-sm font-medium">{skill}</span>
-                    <span className="text-xs text-orange-700">
-                      {count} candidates missing ({Math.round((count/candidates.length)*100)}%)
-                    </span>
+              });
+              
+              // Get top 3 skill gaps
+              const totalCandidates = candidates.length;
+              const topGaps = Object.entries(gapCounts)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 3)
+                .map(([skill, count]) => ({
+                  skill,
+                  count,
+                  percentage: Math.round((count / totalCandidates) * 100)
+                }));
+
+              if (topGaps.length === 0) {
+                return (
+                  <div className="text-center py-8 text-gray-500">
+                    <p className="text-sm">No skill gap data</p>
                   </div>
-                ));
-              })()}
-              <p className="text-xs text-gray-500 mt-3">
-                💡 Consider: Adjust requirements or provide training for these skills
-              </p>
-            </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  {topGaps.map((gap, index) => (
+                    <div key={index}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium text-gray-700">{gap.skill}</span>
+                        <span className="text-sm font-semibold text-red-600">
+                          {gap.count} missing ({gap.percentage}%)
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div 
+                          className="bg-red-500 h-3 rounded-full transition-all duration-500"
+                          style={{ width: `${gap.percentage}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
 
-          {/* Top 3 Candidates */}
+          {/* 3. Top 3 Candidates */}
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold mb-4">⭐ Top 3 Candidates</h3>
-            <div className="space-y-3">
-              {(() => {
-                const topCandidates = [...candidates]
-                  .filter(c => c.test_score) // Only candidates who completed tests
-                  .sort((a, b) => {
-                    const scoreA = (a.ai_score + (a.test_score || 0)) / 2;
-                    const scoreB = (b.ai_score + (b.test_score || 0)) / 2;
-                    return scoreB - scoreA;
-                  })
-                  .slice(0, 3);
-                
-                if (topCandidates.length === 0) {
-                  return <p className="text-sm text-gray-500">No candidates have completed tests yet</p>;
-                }
-                
-                return topCandidates.map((candidate, idx) => {
-                  const avgScore = Math.round((candidate.ai_score + (candidate.test_score || 0)) / 2);
-                  return (
-                    <div key={candidate.id} className="p-3 border rounded-lg hover:bg-gray-50">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <p className="font-semibold text-sm">{candidate.candidate_name}</p>
-                          <p className="text-xs text-gray-600">{candidate.candidate_email}</p>
+            <h2 className="text-xl font-semibold mb-4">🏆 Top 3 Candidates</h2>
+            {(() => {
+              const topCandidates = filteredCandidates
+                .filter(c => c.test_score !== null && c.test_score !== undefined && c.test_score > 0)
+                .sort((a, b) => b.test_score - a.test_score)
+                .slice(0, 3);
+
+              if (topCandidates.length === 0) {
+                return (
+                  <div className="text-center py-8 text-gray-500">
+                    <p className="text-sm">No tests completed</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  {topCandidates.map((candidate, index) => (
+                    <div key={candidate.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+                      {/* Rank Badge */}
+                      <div className="w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                        {index + 1}
+                      </div>
+                      
+                      {/* Candidate Info */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 text-sm truncate">{candidate.candidate_name}</h3>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <span>AI: {candidate.ai_score}%</span>
+                          <span>•</span>
+                          <span className="font-semibold text-green-600">Test: {candidate.test_score}%</span>
                         </div>
-                        <span className="text-lg font-bold text-purple-600">{avgScore}%</span>
                       </div>
-                      <div className="flex gap-2 text-xs">
-                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">AI: {candidate.ai_score}%</span>
-                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded">Test: {candidate.test_score}%</span>
-                      </div>
+                      
+                      {/* Action Button */}
                       <Link 
                         href={`/recruiter/applications/${candidate.id}`}
-                        className="text-xs text-blue-600 hover:text-blue-800 mt-2 inline-block"
+                        className="bg-purple-600 text-white px-3 py-1 rounded text-xs hover:bg-purple-700 flex-shrink-0"
                       >
-                        View Full Profile →
+                        View
                       </Link>
                     </div>
-                  );
-                });
-              })()}
-            </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
+
         </div>
 
         {/* Sort Options */}
@@ -483,7 +549,7 @@ export default function JobCandidates() {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">All Candidates</h2>
             <span className="text-sm text-gray-600">
-              {totalCandidates} total candidates
+              {totalCandidates} {totalCandidates !== totalAllCandidates ? `of ${totalAllCandidates}` : 'total'} candidates
             </span>
           </div>
           
@@ -583,68 +649,82 @@ export default function JobCandidates() {
                         </div>
                       </td>
                     </tr>
-                    {/* Expanded Row - Skill Verification */}
+                    {/* Expanded Row - Skill Performance */}
                     {expandedCandidate === candidate.id && (
                       <tr>
                         <td colSpan="6" className="bg-gray-50 p-6">
-                          <div className="grid md:grid-cols-3 gap-6">
-                            {/* Verified Skills */}
-                            <div className="bg-white p-4 rounded-lg shadow">
-                              <h4 className="font-semibold text-green-700 mb-3 flex items-center">
-                                <span className="mr-2">✅</span> Verified Skills
-                              </h4>
-                              {candidate.verified_skills ? (
+                          {candidate.verification_details ? (
+                            <div className="grid md:grid-cols-2 gap-6">
+                              {/* Skills Passed */}
+                              <div className="bg-white p-4 rounded-lg shadow">
+                                <h4 className="font-semibold text-green-700 mb-3 flex items-center">
+                                  <span className="mr-2">✅</span> Skills Passed
+                                </h4>
                                 <div className="space-y-2">
-                                  {JSON.parse(candidate.verified_skills).map((skill, idx) => (
-                                    <div key={idx} className="flex items-center text-sm">
-                                      <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                                      <span>{skill}</span>
-                                    </div>
-                                  ))}
+                                  {(() => {
+                                    try {
+                                      const details = typeof candidate.verification_details === 'string' 
+                                        ? JSON.parse(candidate.verification_details) 
+                                        : candidate.verification_details;
+                                      const passedSkills = Object.entries(details).filter(([_, data]) => 
+                                        data.percentage >= 50 || data.level === 'strong'
+                                      );
+                                      
+                                      if (passedSkills.length === 0) {
+                                        return <p className="text-sm text-gray-500">No skills passed</p>;
+                                      }
+                                      
+                                      return passedSkills.map(([skill], idx) => (
+                                        <div key={idx} className="flex items-center text-sm">
+                                          <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                          <span>{skill}</span>
+                                        </div>
+                                      ));
+                                    } catch (e) {
+                                      return <p className="text-sm text-gray-500">No test taken yet</p>;
+                                    }
+                                  })()}
                                 </div>
-                              ) : (
-                                <p className="text-sm text-gray-500">No test taken yet</p>
-                              )}
-                            </div>
+                              </div>
 
-                            {/* Unverified Skills */}
-                            <div className="bg-white p-4 rounded-lg shadow">
-                              <h4 className="font-semibold text-red-700 mb-3 flex items-center">
-                                <span className="mr-2">❌</span> Skills Claimed but Not Demonstrated
-                              </h4>
-                              {candidate.unverified_skills ? (
+                              {/* Skills Failed */}
+                              <div className="bg-white p-4 rounded-lg shadow">
+                                <h4 className="font-semibold text-red-700 mb-3 flex items-center">
+                                  <span className="mr-2">❌</span> Skills Failed
+                                </h4>
                                 <div className="space-y-2">
-                                  {JSON.parse(candidate.unverified_skills).map((skill, idx) => (
-                                    <div key={idx} className="flex items-center text-sm">
-                                      <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                                      <span>{skill}</span>
-                                    </div>
-                                  ))}
+                                  {(() => {
+                                    try {
+                                      const details = typeof candidate.verification_details === 'string' 
+                                        ? JSON.parse(candidate.verification_details) 
+                                        : candidate.verification_details;
+                                      const failedSkills = Object.entries(details).filter(([_, data]) => 
+                                        data.percentage < 50 || data.level === 'weak'
+                                      );
+                                      
+                                      if (failedSkills.length === 0) {
+                                        return <p className="text-sm text-gray-500">No skills failed</p>;
+                                      }
+                                      
+                                      return failedSkills.map(([skill], idx) => (
+                                        <div key={idx} className="flex items-center text-sm">
+                                          <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                                          <span>{skill}</span>
+                                        </div>
+                                      ));
+                                    } catch (e) {
+                                      return <p className="text-sm text-gray-500">No test taken yet</p>;
+                                    }
+                                  })()}
                                 </div>
-                              ) : (
-                                <p className="text-sm text-gray-500">No unverified skills</p>
-                              )}
+                              </div>
                             </div>
-
-                            {/* Untested Skills */}
-                            <div className="bg-white p-4 rounded-lg shadow">
-                              <h4 className="font-semibold text-yellow-700 mb-3 flex items-center">
-                                <span className="mr-2">⚠️</span> Skills Not Covered by Test
-                              </h4>
-                              {candidate.untested_skills ? (
-                                <div className="space-y-2">
-                                  {JSON.parse(candidate.untested_skills).map((skill, idx) => (
-                                    <div key={idx} className="flex items-center text-sm">
-                                      <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
-                                      <span>{skill}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-sm text-gray-500">All skills tested</p>
-                              )}
+                          ) : (
+                            <div className="text-center py-8 text-gray-500">
+                              <p>No test taken yet</p>
+                              <p className="text-sm mt-2">Skill performance will be displayed after the candidate completes the assessment.</p>
                             </div>
-                          </div>
+                          )}
                         </td>
                       </tr>
                     )}

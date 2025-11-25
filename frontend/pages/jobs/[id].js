@@ -120,9 +120,30 @@ export default function JobDetails() {
             <p className="text-gray-700 leading-relaxed">{job.description}</p>
           </div>
           
+          {job.mainResponsibilities && job.mainResponsibilities.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold mb-3">Main Responsibilities</h2>
+              <ul className="list-disc list-inside space-y-2 text-gray-700">
+                {job.mainResponsibilities.map((responsibility, index) => (
+                  <li key={index} className="leading-relaxed">{responsibility}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
           <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-3">Requirements</h2>
-            <p className="text-gray-700 leading-relaxed">{job.requirements}</p>
+            <h2 className="text-xl font-semibold mb-3">Preferred Qualifications</h2>
+            <ul className="list-disc list-inside space-y-2 text-gray-700">
+              {job.education && <li className="leading-relaxed">{job.education}</li>}
+              {job.preferredExperience && job.preferredExperience.map((exp, index) => (
+                <li key={index} className="leading-relaxed">{exp}</li>
+              ))}
+              {job.certifications && job.certifications.length > 0 && (
+                <li className="leading-relaxed">
+                  Certifications: {job.certifications.join(', ')}
+                </li>
+              )}
+            </ul>
           </div>
         </div>
 

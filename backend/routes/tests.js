@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../database/init');
 const { getTestForJobTitle } = require('../data/testQuestions');
-const { verifySkills } = require('../services/skillVerification');
+const testConfig = require('../config/testConfig');
 
 const router = express.Router();
 
@@ -42,15 +42,23 @@ router.get('/application/:applicationId', (req, res) => {
     
     console.log('✅ Found application:', application.job_title, 'Status:', application.status);
 
-    // Get test questions based on job title or test category
-    const questions = getTestForJobTitle(application.job_title);
+    // Get role-specific test configuration
+    const roleConfig = testConfig.getConfigForRole(application.job_title);
+    console.log(`📋 Test config for ${application.job_title}:`, roleConfig);
+    
+    // Get test questions based on job title with role-specific configuration
+    const questions = getTestForJobTitle(application.job_title, {
+      maxQuestions: roleConfig.maxQuestions,
+      ensureSkillCoverage: roleConfig.ensureSkillCoverage,
+      randomize: roleConfig.randomize
+    });
     
     if (!questions || questions.length === 0) {
       console.error('❌ No test questions found for job:', application.job_title);
       return res.status(404).json({ error: 'No test questions available for this job' });
     }
     
-    console.log(`✅ Found ${questions.length} test questions`);
+    console.log(`✅ Selected ${questions.length} test questions with skill coverage`);
     
     // Remove correct answers from response
     const questionsForCandidate = questions.map((q, index) => ({
@@ -65,7 +73,13 @@ router.get('/application/:applicationId', (req, res) => {
       job_title: application.job_title,
       candidate_name: application.candidate_name,
       questions: questionsForCandidate,
-      total_points: questions.reduce((sum, q) => sum + (q.points || 10), 0)
+      total_points: questions.reduce((sum, q) => sum + (q.points || 10), 0),
+      test_config: {
+        duration_minutes: roleConfig.duration,
+        total_questions: questions.length,
+        show_progress: testConfig.display.showProgress,
+        allow_review: testConfig.display.allowReview
+      }
     });
   });
 });
@@ -104,72 +118,61 @@ router.post('/submit/:applicationId', (req, res) => {
     // Get correct answers
     const questions = getTestForJobTitle(application.job_title);
     
-    // Calculate score
+    // Calculate score and skill performance
     let totalScore = 0;
     let maxScore = 0;
     const results = [];
+    const skillPerformance = {}; // Track performance per skill
 
     questions.forEach(question => {
       maxScore += question.points;
       const userAnswer = answers.find(a => a.questionId === question.id);
+      const isCorrect = userAnswer && userAnswer.selectedOption === question.correct;
       
-      if (userAnswer && userAnswer.selectedOption === question.correct) {
+      if (isCorrect) {
         totalScore += question.points;
-        results.push({
-          questionId: question.id,
-          correct: true,
-          points: question.points
-        });
-      } else {
-        results.push({
-          questionId: question.id,
-          correct: false,
-          points: 0
-        });
       }
+      
+      results.push({
+        questionId: question.id,
+        correct: isCorrect,
+        points: isCorrect ? question.points : 0
+      });
+      
+      // Track skill-level performance
+      question.validatesSkills.forEach(skill => {
+        if (!skillPerformance[skill]) {
+          skillPerformance[skill] = { correct: 0, total: 0 };
+        }
+        skillPerformance[skill].total++;
+        if (isCorrect) {
+          skillPerformance[skill].correct++;
+        }
+      });
     });
 
     const percentageScore = Math.round((totalScore / maxScore) * 100);
-
-    // Get claimed skills from AI analysis for skill verification
-    console.log('🔍 Fetching claimed skills from AI analysis...');
-    db.get(`
-      SELECT ai.skills_matched, jr.title as job_title
-      FROM ai_analysis ai
-      JOIN applications a ON ai.application_id = a.application_id
-      JOIN job_roles jr ON a.role_id = jr.role_id
-      WHERE ai.application_id = ?
-    `, [applicationId], (err, aiData) => {
-      if (err) {
-        console.error('❌ Error fetching AI data:', err);
-      }
+    
+    // Calculate skill performance levels
+    const skillBreakdown = {};
+    Object.keys(skillPerformance).forEach(skill => {
+      const { correct, total } = skillPerformance[skill];
+      const percentage = Math.round((correct / total) * 100);
       
-      let skillVerification = {
-        verifiedSkills: [],
-        unverifiedSkills: [],
-        untestedSkills: [],
-        verificationDetails: {}
+      // Binary classification: passed (>=50%) or failed (<50%)
+      let level = percentage >= 50 ? 'strong' : 'weak';
+      
+      skillBreakdown[skill] = {
+        correct,
+        total,
+        percentage,
+        level
       };
-      
-      // Perform skill verification if AI data exists
-      if (aiData && aiData.skills_matched) {
-        try {
-          const claimedSkills = JSON.parse(aiData.skills_matched);
-          const jobTitle = aiData.job_title;
-          
-          // Convert answers to array of selected options
-          const userAnswers = answers.map(a => a.selectedOption);
-          
-          // Verify skills using job title instead of test_category
-          skillVerification = verifySkills(claimedSkills, jobTitle, userAnswers);
-        } catch (parseError) {
-          console.error('❌ Error parsing skills or verifying:', parseError);
-        }
-      }
-      
-      // Check if test record already exists
-      console.log('🔍 Checking for existing test record...');
-      db.get('SELECT test_id FROM tests WHERE application_id = ?', [applicationId], (err, existingTest) => {
+    });
+
+    // Check if test record already exists
+    console.log('🔍 Checking for existing test record...');
+    db.get('SELECT test_id FROM tests WHERE application_id = ?', [applicationId], (err, existingTest) => {
       if (err) {
         console.error('❌ Error checking existing test:', err);
         return res.status(500).json({ error: 'Database error' });
@@ -177,61 +180,60 @@ router.post('/submit/:applicationId', (req, res) => {
       
       console.log('📋 Existing test found:', existingTest ? 'Yes' : 'No');
 
-        if (existingTest) {
-          // Update existing test record
-          db.run(
-            `UPDATE tests SET 
-             test_score = ?, completed_at = datetime('now'), duration_minutes = ?, answers = ?,
-             verified_skills = ?, unverified_skills = ?, untested_skills = ?, verification_details = ?
-             WHERE application_id = ?`,
-            [
-              percentageScore, 
-              60, 
-              JSON.stringify(answers), 
-              JSON.stringify(skillVerification.verifiedSkills),
-              JSON.stringify(skillVerification.unverifiedSkills),
-              JSON.stringify(skillVerification.untestedSkills),
-              JSON.stringify(skillVerification.verificationDetails),
-              applicationId
-            ],
-            function(err) {
-              if (err) {
-                console.error('Failed to update test results:', err);
-                return res.status(500).json({ error: 'Failed to save test results' });
-              }
-              updateApplicationStatus();
+      if (existingTest) {
+        // Update existing test record
+        db.run(
+          `UPDATE tests SET 
+           test_score = ?, completed_at = datetime('now'), duration_minutes = ?, answers = ?,
+           verified_skills = ?, unverified_skills = ?, untested_skills = ?, verification_details = ?
+           WHERE application_id = ?`,
+          [
+            percentageScore, 
+            60, 
+            JSON.stringify(answers),
+            JSON.stringify(Object.keys(skillBreakdown).filter(s => skillBreakdown[s].level !== 'weak')),
+            JSON.stringify(Object.keys(skillBreakdown).filter(s => skillBreakdown[s].level === 'weak')),
+            JSON.stringify([]),
+            JSON.stringify(skillBreakdown),
+            applicationId
+          ],
+          function(err) {
+            if (err) {
+              console.error('Failed to update test results:', err);
+              return res.status(500).json({ error: 'Failed to save test results' });
             }
-          );
-        } else {
-          // Create new test record
-          const testToken = `test_${applicationId}_${Date.now()}`;
-          
-          db.run(
-            `INSERT INTO tests 
-             (application_id, test_token, test_score, started_at, completed_at, duration_minutes, answers,
-              verified_skills, unverified_skills, untested_skills, verification_details) 
-             VALUES (?, ?, ?, datetime('now', '-1 hour'), datetime('now'), ?, ?, ?, ?, ?, ?)`,
-            [
-              applicationId, 
-              testToken, 
-              percentageScore, 
-              60, 
-              JSON.stringify(answers),
-              JSON.stringify(skillVerification.verifiedSkills),
-              JSON.stringify(skillVerification.unverifiedSkills),
-              JSON.stringify(skillVerification.untestedSkills),
-              JSON.stringify(skillVerification.verificationDetails)
-            ],
-            function(err) {
-              if (err) {
-                console.error('Failed to save test results:', err);
-                return res.status(500).json({ error: 'Failed to save test results' });
-              }
-              updateApplicationStatus();
+            updateApplicationStatus();
+          }
+        );
+      } else {
+        // Create new test record
+        const testToken = `test_${applicationId}_${Date.now()}`;
+        
+        db.run(
+          `INSERT INTO tests 
+           (application_id, test_token, test_score, started_at, completed_at, duration_minutes, answers,
+            verified_skills, unverified_skills, untested_skills, verification_details) 
+           VALUES (?, ?, ?, datetime('now', '-1 hour'), datetime('now'), ?, ?, ?, ?, ?, ?)`,
+          [
+            applicationId, 
+            testToken, 
+            percentageScore, 
+            60, 
+            JSON.stringify(answers),
+            JSON.stringify(Object.keys(skillBreakdown).filter(s => skillBreakdown[s].level !== 'weak')),
+            JSON.stringify(Object.keys(skillBreakdown).filter(s => skillBreakdown[s].level === 'weak')),
+            JSON.stringify([]),
+            JSON.stringify(skillBreakdown)
+          ],
+          function(err) {
+            if (err) {
+              console.error('Failed to save test results:', err);
+              return res.status(500).json({ error: 'Failed to save test results' });
             }
-          );
-        }
-      });
+            updateApplicationStatus();
+          }
+        );
+      }
     });
 
     function updateApplicationStatus() {
@@ -251,7 +253,15 @@ router.post('/submit/:applicationId', (req, res) => {
             score: percentageScore,
             total_points: totalScore,
             max_points: maxScore,
-            results: results
+            results: results,
+            skill_performance: {
+              breakdown: skillBreakdown,
+              summary: {
+                passed: Object.values(skillBreakdown).filter(s => s.level === 'strong').length,
+                failed: Object.values(skillBreakdown).filter(s => s.level === 'weak').length,
+                total_skills: Object.keys(skillBreakdown).length
+              }
+            }
           });
         }
       );

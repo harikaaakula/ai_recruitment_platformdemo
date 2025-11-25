@@ -128,6 +128,12 @@ export default function SkillTest() {
               <h3 className="text-xl font-semibold mb-4">Question Results</h3>
               {testData.questions.map((question, index) => {
                 const questionResult = result.results.find(r => r.questionId === question.id);
+                
+                // Safety check - if questionResult is undefined, skip this question
+                if (!questionResult) {
+                  return null;
+                }
+                
                 return (
                   <div key={question.id} className={`p-4 rounded-lg mb-3 ${
                     questionResult.correct ? 'bg-green-50 border-l-4 border-green-500' : 'bg-red-50 border-l-4 border-red-500'

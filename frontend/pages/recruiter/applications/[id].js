@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../../components/Layout';
 import { useAuth } from '../../../context/AuthContext';
-import { applicationsAPI, testsAPI } from '../../../utils/api';
-import AIRecommendations from '../../../components/AIRecommendations';
+import { applicationsAPI } from '../../../utils/api';
 
 export default function ApplicationDetails() {
   const { isRecruiter } = useAuth();
@@ -27,6 +26,7 @@ export default function ApplicationDetails() {
       console.log('📚 Education:', appResponse.data.education);
       console.log('💼 Experience:', appResponse.data.experience_years, appResponse.data.experience_level);
       console.log('🎓 Certifications:', appResponse.data.certifications);
+      console.log('💭 AI Reasoning:', appResponse.data.reasoning);
       setApplication(appResponse.data);
     } catch (error) {
       console.error('❌ Error fetching application:', error);
@@ -506,80 +506,59 @@ export default function ApplicationDetails() {
                   </div>
                 </div>
 
-                {/* Skill Verification Results */}
-                {(application.verified_skills || application.unverified_skills || application.untested_skills) && (
+                {/* Skill Performance Results */}
+                {application.verification_details && (
                   <div className="mt-6">
-                    <h4 className="font-semibold mb-3">Skill Verification</h4>
+                    <h4 className="font-semibold mb-3">Skill Performance</h4>
                     <div className="grid md:grid-cols-3 gap-4">
-                      {application.verified_skills && (() => {
+                      {(() => {
                         try {
-                          const verified = typeof application.verified_skills === 'string' 
-                            ? JSON.parse(application.verified_skills) 
-                            : application.verified_skills;
-                          if (Array.isArray(verified) && verified.length > 0) {
-                            return (
-                              <div>
-                                <p className="text-sm font-medium text-green-700 mb-2">✓ Verified Skills</p>
-                                <div className="space-y-1">
-                                  {verified.map((skill, idx) => (
-                                    <span key={idx} className="block px-2 py-1 bg-green-100 text-green-800 rounded text-sm">
-                                      {skill}
-                                    </span>
-                                  ))}
+                          const details = typeof application.verification_details === 'string' 
+                            ? JSON.parse(application.verification_details) 
+                            : application.verification_details;
+                          
+                          const passedSkills = Object.entries(details).filter(([_, data]) => 
+                            data.percentage >= 50 || data.level === 'strong'
+                          );
+                          const failedSkills = Object.entries(details).filter(([_, data]) => 
+                            data.percentage < 50 || data.level === 'weak'
+                          );
+                          
+                          return (
+                            <>
+                              {/* Skills Passed */}
+                              {passedSkills.length > 0 && (
+                                <div>
+                                  <p className="text-sm font-medium text-green-700 mb-2">✅ Skills Passed</p>
+                                  <div className="space-y-1">
+                                    {passedSkills.map(([skill], idx) => (
+                                      <div key={idx} className="flex items-center px-2 py-1 bg-green-100 text-green-800 rounded text-sm">
+                                        <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                        <span>{skill}</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          }
-                        } catch (e) {
-                          return null;
-                        }
-                      })()}
-                      
-                      {application.unverified_skills && (() => {
-                        try {
-                          const unverified = typeof application.unverified_skills === 'string' 
-                            ? JSON.parse(application.unverified_skills) 
-                            : application.unverified_skills;
-                          if (Array.isArray(unverified) && unverified.length > 0) {
-                            return (
-                              <div>
-                                <p className="text-sm font-medium text-red-700 mb-2">✗ Unverified Skills</p>
-                                <div className="space-y-1">
-                                  {unverified.map((skill, idx) => (
-                                    <span key={idx} className="block px-2 py-1 bg-red-100 text-red-800 rounded text-sm">
-                                      {skill}
-                                    </span>
-                                  ))}
+                              )}
+                              
+                              {/* Skills Failed */}
+                              {failedSkills.length > 0 && (
+                                <div>
+                                  <p className="text-sm font-medium text-red-700 mb-2">❌ Skills Failed</p>
+                                  <div className="space-y-1">
+                                    {failedSkills.map(([skill], idx) => (
+                                      <div key={idx} className="flex items-center px-2 py-1 bg-red-100 text-red-800 rounded text-sm">
+                                        <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                                        <span>{skill}</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          }
+                              )}
+                            </>
+                          );
                         } catch (e) {
-                          return null;
-                        }
-                      })()}
-                      
-                      {application.untested_skills && (() => {
-                        try {
-                          const untested = typeof application.untested_skills === 'string' 
-                            ? JSON.parse(application.untested_skills) 
-                            : application.untested_skills;
-                          if (Array.isArray(untested) && untested.length > 0) {
-                            return (
-                              <div>
-                                <p className="text-sm font-medium text-gray-700 mb-2">? Untested Skills</p>
-                                <div className="space-y-1">
-                                  {untested.map((skill, idx) => (
-                                    <span key={idx} className="block px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">
-                                      {skill}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          }
-                        } catch (e) {
-                          return null;
+                          return <p className="text-sm text-gray-500 col-span-3">Unable to load skill performance data</p>;
                         }
                       })()}
                     </div>
@@ -588,10 +567,148 @@ export default function ApplicationDetails() {
               </div>
             )}
 
-            {/* AI Recommendations Section */}
-            {aiInsights.recommendations && aiInsights.recommendations.length > 0 && (
-              <AIRecommendations recommendations={aiInsights.recommendations} />
-            )}
+            {/* AI Analysis & Reasoning Section */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-md p-6 border border-blue-200">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-2xl">🤖</span>
+                <h2 className="text-xl font-semibold text-gray-900">AI Analysis & Reasoning</h2>
+              </div>
+
+              {/* AI Score Summary */}
+              <div className="bg-white rounded-lg p-4 mb-4 border border-blue-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">AI Match Score</span>
+                  <span className={`text-2xl font-bold ${
+                    application.ai_score >= 80 ? 'text-green-600' :
+                    application.ai_score >= 60 ? 'text-blue-600' :
+                    'text-orange-600'
+                  }`}>
+                    {application.ai_score}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all ${
+                      application.ai_score >= 80 ? 'bg-green-500' :
+                      application.ai_score >= 60 ? 'bg-blue-500' :
+                      'bg-orange-500'
+                    }`}
+                    style={{ width: `${application.ai_score}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                {/* Strengths */}
+                <div className="bg-white rounded-lg p-4 border border-green-200">
+                  <h3 className="font-semibold text-green-700 mb-3 flex items-center">
+                    <span className="mr-2">✅</span> Strengths
+                  </h3>
+                  {aiInsights.skills_matched && aiInsights.skills_matched.length > 0 ? (
+                    <ul className="space-y-2">
+                      {aiInsights.skills_matched.slice(0, 5).map((skill, idx) => (
+                        <li key={idx} className="flex items-start text-sm">
+                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-2 mt-1.5 flex-shrink-0"></span>
+                          <span className="text-gray-700">
+                            Has <strong>{typeof skill === 'string' ? skill : skill.skill}</strong> experience
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-gray-500">No specific strengths identified</p>
+                  )}
+                  
+                  {application.experience_years > 0 && (
+                    <div className="mt-3 pt-3 border-t border-green-100">
+                      <p className="text-sm text-gray-700">
+                        <strong>{application.experience_years} years</strong> of relevant experience
+                      </p>
+                    </div>
+                  )}
+                  
+                  {aiInsights.certifications && aiInsights.certifications.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-700">
+                        Holds <strong>{aiInsights.certifications.length}</strong> relevant certification{aiInsights.certifications.length > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Areas of Concern */}
+                <div className="bg-white rounded-lg p-4 border border-orange-200">
+                  <h3 className="font-semibold text-orange-700 mb-3 flex items-center">
+                    <span className="mr-2">⚠️</span> Areas of Concern
+                  </h3>
+                  {aiInsights.skill_gaps && aiInsights.skill_gaps.length > 0 ? (
+                    <ul className="space-y-2">
+                      {aiInsights.skill_gaps.slice(0, 5).map((gap, idx) => (
+                        <li key={idx} className="flex items-start text-sm">
+                          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-2 mt-1.5 flex-shrink-0"></span>
+                          <span className="text-gray-700">
+                            Missing or limited <strong>{typeof gap === 'string' ? gap : gap.skill}</strong> experience
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-gray-500">No significant gaps identified</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Overall Assessment */}
+              <div className="bg-white rounded-lg p-4 mt-4 border border-blue-100">
+                <h3 className="font-semibold text-blue-700 mb-2 flex items-center">
+                  <span className="mr-2">💡</span> Overall Assessment
+                </h3>
+                
+                {/* Show actual AI reasoning if available, otherwise show constructed assessment */}
+                {application.reasoning ? (
+                  <div className="text-sm text-gray-700 leading-relaxed">
+                    <p className="italic bg-blue-50 p-3 rounded border-l-4 border-blue-400">
+                      "{application.reasoning}"
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">— AI Analysis</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    {application.ai_score >= 80 ? (
+                      <>
+                        <strong>Strong candidate</strong> with excellent alignment to job requirements. 
+                        {aiInsights.skills_matched && aiInsights.skills_matched.length > 0 && (
+                          <> Demonstrates proficiency in {aiInsights.skills_matched.length} key skill{aiInsights.skills_matched.length > 1 ? 's' : ''}.</>
+                        )}
+                        {aiInsights.skill_gaps && aiInsights.skill_gaps.length > 0 && (
+                          <> May benefit from training in {aiInsights.skill_gaps.slice(0, 2).map(g => typeof g === 'string' ? g : g.skill).join(' and ')}.</>
+                        )}
+                        {' '}Recommended for interview.
+                      </>
+                    ) : application.ai_score >= 60 ? (
+                      <>
+                        <strong>Moderate match</strong> with acceptable alignment to job requirements.
+                        {aiInsights.skills_matched && aiInsights.skills_matched.length > 0 && (
+                          <> Shows competency in {aiInsights.skills_matched.length} required skill{aiInsights.skills_matched.length > 1 ? 's' : ''}.</>
+                        )}
+                        {aiInsights.skill_gaps && aiInsights.skill_gaps.length > 0 && (
+                          <> However, lacks experience in {aiInsights.skill_gaps.slice(0, 2).map(g => typeof g === 'string' ? g : g.skill).join(' and ')}.</>
+                        )}
+                        {' '}Consider for interview with focus on gap areas.
+                      </>
+                    ) : (
+                      <>
+                        <strong>Below threshold</strong> for this position.
+                        {aiInsights.skill_gaps && aiInsights.skill_gaps.length > 0 && (
+                          <> Missing critical skills including {aiInsights.skill_gaps.slice(0, 3).map(g => typeof g === 'string' ? g : g.skill).join(', ')}.</>
+                        )}
+                        {' '}May not be the best fit for this role at this time.
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -31,14 +31,9 @@ const Layout = ({ children }) => {
                       Dashboard
                     </Link>
                   ) : (
-                    <>
-                      <Link href="/candidate/insights" className="text-blue-600 hover:text-blue-800">
-                        Market Insights
-                      </Link>
-                      <Link href="/jobs" className="text-blue-600 hover:text-blue-800">
-                        Browse Jobs
-                      </Link>
-                    </>
+                    <Link href="/jobs" className="text-blue-600 hover:text-blue-800">
+                      Browse Jobs
+                    </Link>
                   )}
                   <button
                     onClick={handleLogout}

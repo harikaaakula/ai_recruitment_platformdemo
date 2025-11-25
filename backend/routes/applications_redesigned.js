@@ -104,6 +104,7 @@ router.get('/:id', (req, res) => {
       ai.experience_level,
       ai.education,
       ai.certifications,
+      ai.reasoning,
       ai.analysis_completed_at,
       t.test_score,
       t.started_at as test_started_at,
@@ -239,17 +240,28 @@ CERTIFICATIONS:
           
           console.log('✅ AI Analysis Complete!');
           console.log(`⏱️  Processing Time: ${duration}ms`);
+          console.log(`🔧 Matching Method: ${aiResult.matchingMethod || 'unknown'}`);
           console.log('\n📊 AI ANALYSIS RESULTS:');
           console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log(`🎯 AI Score: ${aiResult.score}%`);
+          console.log(`🎯 Final Score: ${aiResult.score}%`);
           console.log(`💼 Experience: ${aiResult.experience_years} years (${aiResult.experience_level})`);
-          console.log(`🎓 Education: ${aiResult.education}`);
+          console.log(`🎓 Education: ${aiResult.education} (Match: ${aiResult.educationMatchPercent}%)`);
           console.log(`📊 Skill Match: ${aiResult.skillMatchPercent}%`);
           console.log(`📚 Knowledge Match: ${aiResult.knowledgeMatchPercent}%`);
           console.log(`📝 Task Match: ${aiResult.taskMatchPercent}%`);
-          console.log(`✅ Skills Found: ${aiResult.skills_matched.join(', ')}`);
-          console.log(`❌ Skill Gaps: ${aiResult.skill_gaps.join(', ')}`);
-          console.log(`📜 Certifications: ${aiResult.certifications.join(', ')}`);
+          console.log(`🎓 Certification Match: ${aiResult.certificationMatchPercent}%`);
+          console.log(`✅ Skills Matched: ${aiResult.skills_matched.join(', ') || 'None'}`);
+          console.log(`❌ Skill Gaps: ${aiResult.skill_gaps.join(', ') || 'None'}`);
+          console.log(`📜 Certifications: ${aiResult.certifications.join(', ') || 'None'}`);
+          if (aiResult.topStrengths && aiResult.topStrengths.length > 0) {
+            console.log(`💪 Top Strengths: ${aiResult.topStrengths.join(', ')}`);
+          }
+          if (aiResult.topGaps && aiResult.topGaps.length > 0) {
+            console.log(`⚠️  Top Gaps: ${aiResult.topGaps.join(', ')}`);
+          }
+          if (aiResult.reasoning) {
+            console.log(`💭 AI Reasoning: ${aiResult.reasoning}`);
+          }
           console.log(`🎯 Eligibility: ${aiResult.eligibility.toUpperCase()}`);
           console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
           
@@ -335,10 +347,11 @@ CERTIFICATIONS:
                           const applicationId = this.lastID;
 
                           // Insert AI analysis
+                          console.log('💾 Saving AI reasoning to database:', aiResult.reasoning);
                           db.run(
                             `INSERT INTO ai_analysis (application_id, ai_score, skills_matched, skill_gaps, 
-                                                     experience_years, experience_level, education, certifications) 
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                                                     experience_years, experience_level, education, certifications, reasoning) 
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                             [
                               applicationId, 
                               aiScore, 
@@ -352,7 +365,8 @@ CERTIFICATIONS:
                               aiResult.experience_years || 2,
                               aiResult.experience_level || 'mid',
                               aiResult.education || 'Bachelor\'s Degree',
-                              JSON.stringify(aiResult.certifications || [])
+                              JSON.stringify(aiResult.certifications || []),
+                              aiResult.reasoning || null
                             ],
                             (err) => {
                               if (err) {
@@ -429,11 +443,15 @@ router.get('/job/:jobId', authenticateToken, requireRole('recruiter'), (req, res
       a.application_id as id,
       a.status,
       a.applied_at as created_at,
+      a.role_id,
       c.name as candidate_name,
       c.email as candidate_email,
       ai.ai_score,
       ai.skills_matched,
       ai.skill_gaps,
+      ai.experience_years,
+      ai.experience_level,
+      ai.certifications,
       t.test_score,
       t.completed_at as test_completed_at,
       t.started_at as test_started_at,

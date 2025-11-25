@@ -72,10 +72,24 @@ db.serialize(() => {
       experience_level TEXT CHECK(experience_level IN ('entry', 'mid', 'senior', 'lead')),
       education TEXT,
       certifications TEXT,
+      reasoning TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (application_id) REFERENCES applications (application_id)
     )
   `);
+
+  // Add reasoning column to existing tables (migration)
+  db.run(`ALTER TABLE ai_analysis ADD COLUMN reasoning TEXT`, (err) => {
+    if (err) {
+      if (err.message.includes('duplicate column')) {
+        console.log('✅ Reasoning column already exists');
+      } else {
+        console.error('❌ Migration error:', err.message);
+      }
+    } else {
+      console.log('✅ Reasoning column added successfully');
+    }
+  });
 
   // Tests table
   db.run(`

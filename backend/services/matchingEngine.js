@@ -154,8 +154,114 @@ function calculateTaskMatch(candidateTasks, requiredTasks) {
 }
 
 /**
+ * Calculate certification match percentage
+ * @param {Array} candidateCertifications - Certifications from resume
+ * @param {Array} requiredCertifications - Certifications from job role
+ * @returns {Object} Match percentage and missing certifications
+ */
+function calculateCertificationMatch(candidateCertifications, requiredCertifications) {
+  if (!requiredCertifications || requiredCertifications.length === 0) {
+    return {
+      percentage: 100, // No certifications required = 100%
+      matched: [],
+      missing: [],
+      matchedCount: 0,
+      totalRequired: 0
+    };
+  }
+  
+  const candidateCertsLower = candidateCertifications.map(c => c.toLowerCase());
+  const matched = [];
+  const missing = [];
+  
+  requiredCertifications.forEach(cert => {
+    const certLower = cert.toLowerCase();
+    // Check for partial matches (e.g., "Security+" matches "CompTIA Security+")
+    const found = candidateCertsLower.some(cc => 
+      cc.includes(certLower) || certLower.includes(cc)
+    );
+    
+    if (found) {
+      matched.push(cert);
+    } else {
+      missing.push(cert);
+    }
+  });
+  
+  const percentage = Math.round((matched.length / requiredCertifications.length) * 100);
+  
+  return {
+    percentage,
+    matched,
+    missing,
+    matchedCount: matched.length,
+    totalRequired: requiredCertifications.length
+  };
+}
+
+/**
+ * Calculate education match
+ * @param {string} candidateEducation - Education from resume
+ * @param {string} requiredEducation - Education from job role
+ * @returns {Object} Match result with percentage
+ */
+function calculateEducationMatch(candidateEducation, requiredEducation) {
+  if (!requiredEducation) {
+    return {
+      percentage: 100, // No education required = 100%
+      match: true,
+      candidateLevel: candidateEducation,
+      requiredLevel: 'Not specified'
+    };
+  }
+  
+  const educationLevels = {
+    'high school': 1,
+    'associate': 2,
+    'bachelor': 3,
+    'master': 4,
+    'phd': 5,
+    'doctorate': 5
+  };
+  
+  const candidateLower = (candidateEducation || '').toLowerCase();
+  const requiredLower = requiredEducation.toLowerCase();
+  
+  // Determine education levels
+  let candidateLevel = 0;
+  let requiredLevel = 0;
+  
+  for (const [degree, level] of Object.entries(educationLevels)) {
+    if (candidateLower.includes(degree)) {
+      candidateLevel = Math.max(candidateLevel, level);
+    }
+    if (requiredLower.includes(degree)) {
+      requiredLevel = Math.max(requiredLevel, level);
+    }
+  }
+  
+  // Calculate match percentage
+  let percentage = 0;
+  if (candidateLevel === 0) {
+    percentage = 0; // No education specified
+  } else if (candidateLevel >= requiredLevel) {
+    percentage = 100; // Meets or exceeds requirement
+  } else {
+    // Partial credit for lower degree
+    percentage = Math.round((candidateLevel / requiredLevel) * 70);
+  }
+  
+  return {
+    percentage,
+    match: candidateLevel >= requiredLevel,
+    candidateLevel: candidateEducation,
+    requiredLevel: requiredEducation
+  };
+}
+
+/**
  * Calculate final weighted score
- * @param {Object} matches - Skill, knowledge, task match results
+ * @param {Object} matches - Skill, knowledge, task, certification, education match results
  * @param {Object} weights - Weights from job role
  * @returns {number} Final score (0-100)
  */
@@ -164,34 +270,43 @@ function calculateFinalScore(matches, weights) {
   const knowledgeScore = matches.knowledgeMatch.percentage * weights.knowledge;
   const taskScore = matches.taskMatch.percentage * weights.tasks;
   
-  return Math.round(skillScore + knowledgeScore + taskScore);
+  // Add certification and education scores if weights exist
+  const certificationScore = weights.certifications 
+    ? matches.certificationMatch.percentage * weights.certifications 
+    : 0;
+  const educationScore = weights.education 
+    ? matches.educationMatch.percentage * weights.education 
+    : 0;
+  
+  return Math.round(skillScore + knowledgeScore + taskScore + certificationScore + educationScore);
 }
 
 /**
  * Determine eligibility based on score
  * @param {number} finalScore - Final calculated score
+ * @param {number} thresholdScore - Job-specific threshold score
  * @returns {Object} Eligibility status and message
  */
-function determineEligibility(finalScore) {
-  if (finalScore < 60) {
+function determineEligibility(finalScore, thresholdScore = 60) {
+  if (finalScore < thresholdScore) {
     return {
       status: 'not_eligible',
-      message: 'Not eligible for test',
+      message: `Not eligible for test (score: ${finalScore}%, threshold: ${thresholdScore}%)`,
       color: 'red'
     };
   }
   
-  if (finalScore >= 60 && finalScore < 75) {
+  if (finalScore >= thresholdScore && finalScore < thresholdScore + 15) {
     return {
       status: 'borderline',
-      message: 'Borderline - review recommended',
+      message: `Borderline - review recommended (score: ${finalScore}%, threshold: ${thresholdScore}%)`,
       color: 'yellow'
     };
   }
   
   return {
     status: 'eligible',
-    message: 'Eligible for test',
+    message: `Eligible for test (score: ${finalScore}%, threshold: ${thresholdScore}%)`,
     color: 'green'
   };
 }
@@ -227,14 +342,26 @@ function matchResumeToJob(resumeParsedData, jobData) {
     jobData.tasks
   );
   
+  // Calculate certification match
+  const certificationMatch = calculateCertificationMatch(
+    resumeParsedData.certifications || [],
+    jobData.certifications || []
+  );
+  
+  // Calculate education match
+  const educationMatch = calculateEducationMatch(
+    resumeParsedData.education,
+    jobData.education
+  );
+  
   // Calculate final weighted score
   const finalScore = calculateFinalScore(
-    { skillMatch, knowledgeMatch, taskMatch },
+    { skillMatch, knowledgeMatch, taskMatch, certificationMatch, educationMatch },
     jobData.weights
   );
   
-  // Determine eligibility
-  const eligibility = determineEligibility(finalScore);
+  // Determine eligibility using job-specific threshold
+  const eligibility = determineEligibility(finalScore, jobData.thresholdScore || 60);
   
   // Collect all warnings
   const warnings = [];
@@ -246,6 +373,12 @@ function matchResumeToJob(resumeParsedData, jobData) {
   }
   if (knowledgeMatch.percentage < 40) {
     warnings.push(`Limited knowledge match: ${knowledgeMatch.matchedCount}/${knowledgeMatch.totalRequired} areas covered`);
+  }
+  if (certificationMatch.totalRequired > 0 && certificationMatch.percentage < 50) {
+    warnings.push(`Missing key certifications: ${certificationMatch.missing.join(', ')}`);
+  }
+  if (!educationMatch.match) {
+    warnings.push(`Education below requirement: has ${educationMatch.candidateLevel}, needs ${educationMatch.requiredLevel}`);
   }
   
   return {
@@ -277,6 +410,19 @@ function matchResumeToJob(resumeParsedData, jobData) {
       matchedCount: taskMatch.matchedCount,
       totalRequired: taskMatch.totalRequired
     },
+    certificationMatchPercent: certificationMatch.percentage,
+    certificationDetails: {
+      matched: certificationMatch.matched,
+      missing: certificationMatch.missing,
+      matchedCount: certificationMatch.matchedCount,
+      totalRequired: certificationMatch.totalRequired
+    },
+    educationMatchPercent: educationMatch.percentage,
+    educationDetails: {
+      match: educationMatch.match,
+      candidateLevel: educationMatch.candidateLevel,
+      requiredLevel: educationMatch.requiredLevel
+    },
     finalScore,
     eligibility: eligibility.status,
     eligibilityMessage: eligibility.message,
@@ -297,6 +443,8 @@ module.exports = {
   calculateSkillMatch,
   calculateKnowledgeMatch,
   calculateTaskMatch,
+  calculateCertificationMatch,
+  calculateEducationMatch,
   calculateFinalScore,
   determineEligibility
 };

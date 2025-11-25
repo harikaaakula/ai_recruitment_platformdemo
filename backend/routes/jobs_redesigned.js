@@ -14,7 +14,10 @@ router.get('/', (req, res) => {
     id: job.id,
     title: job.title,
     description: job.overview, // Use overview as description
-    requirements: `Tasks: ${job.tasks.join(', ')}. Knowledge: ${job.knowledge.join(', ')}. Skills: ${job.skills.join(', ')}.`,
+    mainResponsibilities: job.mainResponsibilities || [], // New structured field
+    education: job.education || '',
+    preferredExperience: job.preferredExperience || [],
+    certifications: job.certifications || [],
     threshold_score: job.thresholdScore || 60,
     salary_min: 70000, // Default salary
     salary_max: 120000,
@@ -23,7 +26,7 @@ router.get('/', (req, res) => {
     created_at: new Date().toISOString(),
     recruiter_name: 'HR Department',
     application_count: 0,
-    // ATS-specific fields
+    // ATS-specific fields (keep for backward compatibility)
     overview: job.overview,
     tasks: job.tasks,
     knowledge: job.knowledge,
@@ -57,7 +60,10 @@ router.get('/:id', (req, res) => {
     id: job.id,
     title: job.title,
     description: job.overview,
-    requirements: `Tasks: ${job.tasks.join(', ')}. Knowledge: ${job.knowledge.join(', ')}. Skills: ${job.skills.join(', ')}.`,
+    mainResponsibilities: job.mainResponsibilities || [], // New structured field
+    education: job.education || '',
+    preferredExperience: job.preferredExperience || [],
+    certifications: job.certifications || [],
     threshold_score: job.thresholdScore || 60,
     salary_min: 70000,
     salary_max: 120000,
@@ -66,11 +72,11 @@ router.get('/:id', (req, res) => {
     created_at: new Date().toISOString(),
     recruiter_name: 'HR Department',
     application_count: 0,
-    // ATS-specific fields
+    // ATS-specific fields (keep for backward compatibility)
     overview: job.overview,
     tasks: job.tasks,
     knowledge: job.knowledge,
-    skills: job.skills,
+    skills: job.skillKeywords || job.skills, // Use skillKeywords for filtering
     experienceRange: job.experienceRange,
     weights: job.weights,
     test_category: job.title.toLowerCase().replace(/\s+/g, '_')
