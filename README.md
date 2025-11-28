@@ -1,6 +1,6 @@
-# AI-Powered Recruitment Platform
+# AI-Powered Cybersecurity Recruitment Platform
 
-An intelligent recruitment system that uses AI to analyze resumes, score candidates, verify skills through automated tests, and provide actionable insights to recruiters.
+An intelligent recruitment system specialized for cybersecurity roles that uses AI to analyze resumes, score candidates, verify skills through automated tests, and provide actionable insights to recruiters.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ An intelligent recruitment system that uses AI to analyze resumes, score candida
 
 ## Overview
 
-The AI-Powered Recruitment Platform streamlines the hiring process by automatically parsing resumes, scoring candidates using AI-based matching against job requirements, administering skill tests to verify competencies, and providing comprehensive analytics to recruiters.
+The AI-Powered Cybersecurity Recruitment Platform streamlines the hiring process for cybersecurity positions by automatically parsing resumes, scoring candidates using AI-based matching against job requirements, administering skill tests to verify competencies, and providing comprehensive analytics to recruiters.
 
 The platform features:
 - AI-powered resume parsing and analysis
@@ -720,4 +720,4 @@ This is a demonstration project showcasing AI-powered recruitment. For productio
 
 ---
 
-Built as an AI-powered recruitment platform demonstration showcasing resume parsing, automated candidate scoring, skill verification, and data-driven recruitment insights.
+Built as an AI-powered cybersecurity recruitment platform demonstration showcasing resume parsing, automated candidate scoring, skill verification, and data-driven recruitment insights for cybersecurity roles.
