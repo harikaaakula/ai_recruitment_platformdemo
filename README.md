@@ -450,15 +450,13 @@ AI Score = (Skills × 40%) + (Knowledge × 25%) + (Tasks × 25%) +
 ### 3. Skill Testing
 
 **Test Generation:**
-- Maps candidate's claimed skills to test questions
+- Maps candidates to respective skill category to test questions
 - Selects 4-10 questions covering different skills
 - Multiple choice format
 
 **Skill Verification:**
 - For each skill: calculates (correct answers / total questions) × 100
-- Verified: ≥70% correct
-- Unverified: <70% correct
-- Untested: No questions available
+- Verifies the skills and gives skills passed vs skills failed 
 
 ### 4. Composite Score
 
